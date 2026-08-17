@@ -43,7 +43,7 @@ export type CookieClearSession = {
   restoreClearIdentities: CookieClearStore['restoreClearIdentities']
 }
 
-const clearLocks = new WeakMap<object, Promise<void>>()
+const mutationLocks = new WeakMap<object, Promise<void>>()
 
 function cookieClearKey(url: string, name: string): string {
   return JSON.stringify([url, name])
@@ -66,17 +66,30 @@ export function identitiesFromClearCookies(
   }))
 }
 
-export async function withCookieClearLock<T>(owner: object, run: () => Promise<T>): Promise<T> {
-  const previous = clearLocks.get(owner) ?? Promise.resolve()
+/**
+ * Serialises every live-jar mutation for one owner.
+ *
+ * Why (STA-4601): an import's clear, its writes, and its rollback are one transaction. Holding the
+ * lock for the clear alone lets a second import interleave between them, so a stale rollback can
+ * remove cookies the newer import already reported as written. Callers that need the lock across a
+ * try/finally take it directly; callers with a single callback use the wrapper below.
+ */
+export async function acquireCookieMutationLock(owner: object): Promise<() => void> {
+  const previous = mutationLocks.get(owner) ?? Promise.resolve()
   let release!: () => void
   const current = new Promise<void>((resolve) => {
     release = resolve
   })
-  clearLocks.set(
+  mutationLocks.set(
     owner,
     previous.then(() => current)
   )
   await previous
+  return release
+}
+
+export async function withCookieMutationLock<T>(owner: object, run: () => Promise<T>): Promise<T> {
+  const release = await acquireCookieMutationLock(owner)
   try {
     return await run()
   } finally {
@@ -147,7 +160,7 @@ async function restoreClearedCookies(
 export async function removeTransplantableCookies(
   targetSession: CookieClearSession
 ): Promise<void> {
-  return withCookieClearLock(targetSession, async () => {
+  return withCookieMutationLock(targetSession, async () => {
     const store = targetSession.cookies
     const initialCookies = await store.get({})
     if (initialCookies.length === 0) {
