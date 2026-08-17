@@ -105,6 +105,31 @@ describe('project group deletion store routing', () => {
     ])
   })
 
+  it('routes a desktop local group delete by row owner when a remote runtime is focused', async () => {
+    projectGroupsDelete.mockResolvedValue(true)
+    const localGroup = { ...projectGroup, executionHostId: 'local' as const }
+    const remoteCollision = {
+      ...projectGroup,
+      name: 'Remote',
+      executionHostId: 'runtime:wrong-env' as const
+    }
+    const store = createTestStore()
+    store.setState({
+      settings: { activeRuntimeEnvironmentId: 'wrong-env' } as never,
+      projectGroups: [localGroup, remoteCollision]
+    })
+
+    await expect(
+      store
+        .getState()
+        .deleteProjectGroup(projectGroup.id, { executionHostId: localGroup.executionHostId })
+    ).resolves.toBe(true)
+
+    expect(projectGroupsDelete).toHaveBeenCalledWith({ groupId: projectGroup.id })
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+    expect(store.getState().projectGroups).toEqual([remoteCollision])
+  })
+
   it('uses the remote delete response shape before mutating local state', async () => {
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-delete-group',
@@ -112,17 +137,22 @@ describe('project group deletion store routing', () => {
       result: { deleted: false },
       _meta: { runtimeId: 'runtime-remote' }
     })
-    const groupedRepo = { ...remoteRepo, projectGroupId: projectGroup.id }
+    const remoteGroup = { ...projectGroup, executionHostId: 'runtime:env-1' as const }
+    const groupedRepo = {
+      ...remoteRepo,
+      projectGroupId: projectGroup.id,
+      executionHostId: 'runtime:env-1' as const
+    }
     const store = createTestStore()
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
-      projectGroups: [projectGroup],
+      projectGroups: [remoteGroup],
       repos: [groupedRepo]
     })
 
     await expect(store.getState().deleteProjectGroup(projectGroup.id)).resolves.toBe(false)
 
-    expect(store.getState().projectGroups).toEqual([projectGroup])
+    expect(store.getState().projectGroups).toEqual([remoteGroup])
     expect(store.getState().repos).toEqual([groupedRepo])
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',

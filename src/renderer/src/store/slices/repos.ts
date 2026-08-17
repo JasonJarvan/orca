@@ -88,6 +88,7 @@ import {
   getRepoExecutionHostId,
   isRuntimeOwnedSshTargetId,
   LOCAL_EXECUTION_HOST_ID,
+  normalizeExecutionHostId,
   parseExecutionHostId,
   toRuntimeExecutionHostId,
   toSshExecutionHostId,
@@ -218,6 +219,11 @@ export type FolderWorkspacePathStatusCacheEntry = {
 
 export type DeleteProjectGroupWithContainedProjectsOptions = {
   removeContainedProjects: boolean
+  executionHostId?: ExecutionHostId
+}
+
+type ProjectGroupMutationOptions = {
+  executionHostId?: ExecutionHostId
 }
 
 type AllHostCatalogFetchOptions = {
@@ -1120,11 +1126,39 @@ function mergeProjectCompatibilityForHostRepoChange({
   })
 }
 
-function getProjectGroupHostId(group: Pick<ProjectGroup, 'connectionId' | 'executionHostId'>) {
-  if (group.executionHostId) {
-    return group.executionHostId
+function getProjectGroupHostId(
+  group: Pick<ProjectGroup, 'connectionId' | 'executionHostId'>
+): ExecutionHostId {
+  const executionHostId = normalizeExecutionHostId(group.executionHostId)
+  if (executionHostId) {
+    return executionHostId
   }
   return group.connectionId ? toSshExecutionHostId(group.connectionId) : LOCAL_EXECUTION_HOST_ID
+}
+
+function getProjectGroupRuntimeTarget(
+  group: Pick<ProjectGroup, 'connectionId' | 'executionHostId'>
+): ReturnType<typeof getActiveRuntimeTarget> {
+  const owner = parseExecutionHostId(getProjectGroupHostId(group))
+  return owner?.kind === 'runtime'
+    ? { kind: 'environment', environmentId: owner.environmentId }
+    : { kind: 'local' }
+}
+
+function findProjectGroupForMutation(
+  state: Pick<AppState, 'projectGroups' | 'settings'>,
+  groupId: string,
+  options?: ProjectGroupMutationOptions
+): ProjectGroup | null {
+  const matches = state.projectGroups.filter((group) => group.id === groupId)
+  if (options?.executionHostId) {
+    return matches.find((group) => getProjectGroupHostId(group) === options.executionHostId) ?? null
+  }
+  const focusedHostId = getRuntimeTargetHostId(getActiveRuntimeTarget(state.settings))
+  return (
+    matches.find((group) => getProjectGroupHostId(group) === focusedHostId) ??
+    (matches.length === 1 ? matches[0]! : null)
+  )
 }
 
 function getProjectGroupHostIdentity(group: ProjectGroup): string {
@@ -1885,9 +1919,10 @@ export type RepoSlice = {
   deleteFolderWorkspace: (folderWorkspaceId: string) => Promise<boolean>
   updateProjectGroup: (
     groupId: string,
-    updates: Partial<Pick<ProjectGroup, 'name' | 'isCollapsed' | 'tabOrder' | 'color'>>
+    updates: Partial<Pick<ProjectGroup, 'name' | 'isCollapsed' | 'tabOrder' | 'color'>>,
+    options?: ProjectGroupMutationOptions
   ) => Promise<boolean>
-  deleteProjectGroup: (groupId: string) => Promise<boolean>
+  deleteProjectGroup: (groupId: string, options?: ProjectGroupMutationOptions) => Promise<boolean>
   deleteProjectGroupWithContainedProjects: (
     groupId: string,
     options: DeleteProjectGroupWithContainedProjectsOptions
@@ -2990,10 +3025,15 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
     }
   },
 
-  updateProjectGroup: async (groupId, updates) => {
+  updateProjectGroup: async (groupId, updates, options) => {
+    const group = findProjectGroupForMutation(get(), groupId, options)
+    if (!group) {
+      return false
+    }
+    const ownerHostId = getProjectGroupHostId(group)
     try {
-      // Why: project groups are focused-host-scoped by design; all CRUD routes by the focused host and the list is replaced, not merged.
-      const target = getActiveRuntimeTarget(get().settings)
+      // Why: all-host catalogs outlive focus changes, so mutations must follow the row's persisted owner.
+      const target = getProjectGroupRuntimeTarget(group)
       const updated =
         target.kind === 'local'
           ? await window.api.projectGroups.update({ groupId, updates })
@@ -3010,7 +3050,9 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       }
       const ownedGroup = projectGroupWithFetchedOwner(updated, target)
       set((s) => ({
-        projectGroups: s.projectGroups.map((group) => (group.id === groupId ? ownedGroup : group)),
+        projectGroups: s.projectGroups.map((entry) =>
+          entry.id === groupId && getProjectGroupHostId(entry) === ownerHostId ? ownedGroup : entry
+        ),
         folderWorkspacePathStatuses: {}
       }))
       return true
@@ -3020,10 +3062,14 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
     }
   },
 
-  deleteProjectGroup: async (groupId) => {
+  deleteProjectGroup: async (groupId, options) => {
+    const group = findProjectGroupForMutation(get(), groupId, options)
+    if (!group) {
+      return false
+    }
+    const ownerHostId = getProjectGroupHostId(group)
     try {
-      // Why: project groups are focused-host-scoped by design (see updateProjectGroup).
-      const target = getActiveRuntimeTarget(get().settings)
+      const target = getProjectGroupRuntimeTarget(group)
       const deleted =
         target.kind === 'local'
           ? await window.api.projectGroups.delete({ groupId })
@@ -3039,14 +3085,24 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         return false
       }
       set((s) => {
-        const deletedGroupIds = getProjectGroupSubtreeIds(s.projectGroups, groupId)
+        const ownerGroups = s.projectGroups.filter(
+          (entry) => getProjectGroupHostId(entry) === ownerHostId
+        )
+        const deletedGroupIds = getProjectGroupSubtreeIds(ownerGroups, groupId)
         return {
-          projectGroups: s.projectGroups.filter((group) => !deletedGroupIds.has(group.id)),
+          projectGroups: s.projectGroups.filter(
+            (entry) =>
+              getProjectGroupHostId(entry) !== ownerHostId || !deletedGroupIds.has(entry.id)
+          ),
           folderWorkspaces: s.folderWorkspaces.filter(
-            (workspace) => !deletedGroupIds.has(workspace.projectGroupId)
+            (workspace) =>
+              getFolderWorkspaceHostId(workspace, s.projectGroups) !== ownerHostId ||
+              !deletedGroupIds.has(workspace.projectGroupId)
           ),
           repos: s.repos.map((repo) =>
-            repo.projectGroupId && deletedGroupIds.has(repo.projectGroupId)
+            repo.projectGroupId &&
+            getRepoExecutionHostId(repo) === ownerHostId &&
+            deletedGroupIds.has(repo.projectGroupId)
               ? { ...repo, projectGroupId: null }
               : repo
           ),
@@ -3061,7 +3117,16 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   },
 
   deleteProjectGroupWithContainedProjects: async (groupId, options) => {
-    const targets = selectProjectGroupRemovalTargets(get().projectGroups, get().repos, groupId)
+    const state = get()
+    const group = findProjectGroupForMutation(state, groupId, options)
+    const ownerHostId = group ? getProjectGroupHostId(group) : null
+    const targets = selectProjectGroupRemovalTargets(
+      ownerHostId
+        ? state.projectGroups.filter((entry) => getProjectGroupHostId(entry) === ownerHostId)
+        : [],
+      ownerHostId ? state.repos.filter((repo) => getRepoExecutionHostId(repo) === ownerHostId) : [],
+      groupId
+    )
     const requestedProjectIds = options.removeContainedProjects ? targets.projectIds : []
     if (!targets.groupExists) {
       return {
@@ -3073,7 +3138,10 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       }
     }
 
-    const deleted = await get().deleteProjectGroup(groupId)
+    const deleted = await get().deleteProjectGroup(
+      groupId,
+      ownerHostId ? { executionHostId: ownerHostId } : undefined
+    )
     if (!deleted) {
       return {
         status: 'group-delete-failed',

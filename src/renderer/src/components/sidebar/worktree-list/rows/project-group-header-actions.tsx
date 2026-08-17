@@ -21,15 +21,15 @@ import {
 } from './header-event-guards'
 
 export function ProjectGroupHeaderMenu({
-  groupId,
+  group,
   label,
   onRename,
   onDelete
 }: {
-  groupId: string
+  group: ProjectGroup
   label: string
-  onRename: (groupId: string, currentName: string) => void
-  onDelete: (groupId: string, groupName: string) => void
+  onRename: (group: ProjectGroup) => void
+  onDelete: (group: ProjectGroup) => void
 }): React.JSX.Element {
   return (
     <DropdownMenu modal={false}>
@@ -64,10 +64,10 @@ export function ProjectGroupHeaderMenu({
         onClick={stopRepoHeaderMenuEvent}
         onKeyDown={stopRepoHeaderMenuEvent}
       >
-        <DropdownMenuItem onSelect={() => onRename(groupId, label)}>
+        <DropdownMenuItem onSelect={() => onRename(group)}>
           {translate('auto.components.sidebar.WorktreeList.4d7b73658c', 'Rename group')}
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" onSelect={() => onDelete(groupId, label)}>
+        <DropdownMenuItem variant="destructive" onSelect={() => onDelete(group)}>
           {translate('auto.components.sidebar.WorktreeList.902115cdbe', 'Delete group')}
         </DropdownMenuItem>
       </DropdownMenuContent>

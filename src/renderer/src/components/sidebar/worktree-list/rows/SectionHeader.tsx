@@ -56,8 +56,8 @@ export type SectionHeaderRowContext = {
   }) => FolderWorkspacePathStatus | null
   toggleGroupWithScrollAnchor: (groupKey: string) => void
   projectActions: RepoHeaderProjectActions
-  onRenameProjectGroup: (groupId: string, currentName: string) => void
-  onDeleteProjectGroup: (groupId: string, groupName: string) => void
+  onRenameProjectGroup: (group: ProjectGroup) => void
+  onDeleteProjectGroup: (group: ProjectGroup) => void
   onCreateFolderWorkspace: (projectGroup: ProjectGroup) => void
   onWorkspaceStatusDragOver: (event: React.DragEvent, status: WorkspaceStatus) => void
   onWorkspaceStatusDragLeave: (event: React.DragEvent) => void
@@ -350,9 +350,12 @@ export function renderWorktreeSectionHeaderRow(args: {
             </div>
           ) : null}
 
-          {isProjectGroupHeader && !row.repo && projectGroupIdForHeader ? (
+          {isProjectGroupHeader &&
+          !row.repo &&
+          row.projectGroup &&
+          'parentPath' in row.projectGroup ? (
             <ProjectGroupHeaderMenu
-              groupId={projectGroupIdForHeader}
+              group={row.projectGroup}
               label={row.label}
               onRename={ctx.onRenameProjectGroup}
               onDelete={ctx.onDeleteProjectGroup}

@@ -3,16 +3,27 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { selectProjectGroupRemovalTargets } from '@/store/slices/project-group-removal-targets'
+import {
+  getRepoExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
+import { getProjectGroupExecutionHostIdForRows } from '../listing/host-filtering'
 
 export type ProjectGroupNameDialogState =
   | { type: 'create-from-repo'; repo: Repo }
-  | { type: 'rename'; groupId: string; currentName: string }
+  | {
+      type: 'rename'
+      groupId: string
+      currentName: string
+      executionHostId: ExecutionHostId
+    }
 
 export type ProjectGroupDeleteDialogState = {
   groupId: string
   groupName: string
+  executionHostId: ExecutionHostId
   removeContainedProjects: boolean
 }
 
@@ -95,8 +106,13 @@ export function useProjectGroupDialogs(args: {
     [moveProjectToGroup]
   )
 
-  const handleRenameProjectGroup = useCallback((groupId: string, currentName: string) => {
-    setNameDialog({ type: 'rename', groupId, currentName })
+  const handleRenameProjectGroup = useCallback((group: ProjectGroup) => {
+    setNameDialog({
+      type: 'rename',
+      groupId: group.id,
+      currentName: group.name,
+      executionHostId: getProjectGroupExecutionHostIdForRows(group, 'local')
+    })
   }, [])
 
   const handleSubmitProjectGroupName = useCallback(
@@ -111,7 +127,11 @@ export function useProjectGroupDialogs(args: {
         }
         return
       }
-      await updateProjectGroup(nameDialog.groupId, { name })
+      await updateProjectGroup(
+        nameDialog.groupId,
+        { name },
+        { executionHostId: nameDialog.executionHostId }
+      )
     },
     [createProjectGroup, moveProjectToGroup, nameDialog, updateProjectGroup]
   )
@@ -120,7 +140,14 @@ export function useProjectGroupDialogs(args: {
     if (!deleteDialog) {
       return null
     }
-    return selectProjectGroupRemovalTargets(projectGroups, repos, deleteDialog.groupId)
+    const ownerHostId = deleteDialog.executionHostId
+    return selectProjectGroupRemovalTargets(
+      projectGroups.filter(
+        (group) => getProjectGroupExecutionHostIdForRows(group, 'local') === ownerHostId
+      ),
+      repos.filter((repo) => getRepoExecutionHostId(repo) === ownerHostId),
+      deleteDialog.groupId
+    )
   }, [deleteDialog, projectGroups, repos])
   const deleteProjectCount = deleteTargets?.projectIds.length ?? 0
   const deleteProjectNames = useMemo(
@@ -133,8 +160,13 @@ export function useProjectGroupDialogs(args: {
   const removeContainedProjects =
     deleteProjectCount > 0 && deleteDialog?.removeContainedProjects === true
 
-  const handleDeleteProjectGroup = useCallback((groupId: string, groupName: string) => {
-    setDeleteDialog({ groupId, groupName, removeContainedProjects: false })
+  const handleDeleteProjectGroup = useCallback((group: ProjectGroup) => {
+    setDeleteDialog({
+      groupId: group.id,
+      groupName: group.name,
+      executionHostId: getProjectGroupExecutionHostIdForRows(group, 'local'),
+      removeContainedProjects: false
+    })
   }, [])
 
   const handleConfirmDeleteProjectGroup = useCallback(async () => {
@@ -144,7 +176,8 @@ export function useProjectGroupDialogs(args: {
     try {
       reportProjectGroupDeleteFailures(
         await deleteProjectGroupWithContainedProjects(deleteDialog.groupId, {
-          removeContainedProjects
+          removeContainedProjects,
+          executionHostId: deleteDialog.executionHostId
         })
       )
     } finally {
