@@ -19,6 +19,7 @@ import {
   ensureUnsupportedTerminalPromptReceipt,
   observeReplayedTerminalPrompt
 } from './terminal-prompt-receipt'
+import { CLIENT_SURFACE_WEB_RUNTIME_CAPABILITY } from '../../../../../shared/protocol-version'
 
 export const TERMINAL_SEND_METHODS = [
   defineMethod({
@@ -29,6 +30,7 @@ export const TERMINAL_SEND_METHODS = [
       {
         runtime,
         clientId,
+        clientCapabilities,
         signal,
         orchestrationMutation,
         recordMutationReceipt,
@@ -36,7 +38,14 @@ export const TERMINAL_SEND_METHODS = [
         replayedMutationReceipt
       }
     ) => {
-      await assertTerminalSendTextWithinLimit(params.text)
+      const clientSurface = clientCapabilities?.includes(CLIENT_SURFACE_WEB_RUNTIME_CAPABILITY)
+        ? ('web' as const)
+        : undefined
+      const text =
+        params.agentPrompt === true && typeof params.text === 'string'
+          ? runtime.decorateAgentPromptForClient(params.text, clientSurface)
+          : params.text
+      await assertTerminalSendTextWithinLimit(text)
       await assertTerminalSendTextWithinLimit(params.resolvedLaunchDraft?.text)
       if (params.text) {
         await assertLegacyAiVaultResumeCommandAllowed(params.text, () =>
@@ -125,7 +134,7 @@ export const TERMINAL_SEND_METHODS = [
           }
         }
       }
-      const hasText = typeof params.text === 'string' && params.text.length > 0
+      const hasText = typeof text === 'string' && text.length > 0
       const hasSuffix = params.enter === true || params.interrupt === true
       if (params.requireAgentStatus === 'sendable' && hasText && hasSuffix) {
         // Why: guarded sends are two-phase; reject combined payload + submit so a guard flip can't cause partial delivery.
@@ -210,7 +219,7 @@ export const TERMINAL_SEND_METHODS = [
       let acceptedPromptCheckpoint: unknown
       try {
         result = useSettledAgentPrompt
-          ? await runtime.sendTerminalAgentPrompt(params.terminal, params.text!, {
+          ? await runtime.sendTerminalAgentPrompt(params.terminal, text!, {
               beforeWrite,
               signal,
               ...(orchestrationMutation
@@ -228,7 +237,7 @@ export const TERMINAL_SEND_METHODS = [
           : await runtime.sendTerminal(
               params.terminal,
               {
-                text: params.text,
+                text,
                 enter: params.enter === true,
                 interrupt: params.interrupt === true
               },

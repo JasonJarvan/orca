@@ -14,6 +14,7 @@ import type { StructuredAgentSessionStatusSink } from '../native-chat/agent-sess
 import type { ObservedAgentStatusPaneIdentity } from '../ipc/agent-status-ipc-boundary'
 import type { AgentHookAuthorityAttestation } from '../agent-hooks/server'
 import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
+import type { OrcaAgentHostMode } from '../../shared/agent-client-context'
 import type {
   AiVaultPrepareSessionResumeArgs,
   AiVaultPrepareSessionResumeResult
@@ -101,6 +102,8 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
   protected readonly buildAgentHookPtyEnv: (() => Record<string, string>) | null
 
   protected readonly getDesktopWindowStatusFn: () => RuntimeDesktopWindowStatus
+
+  protected readonly agentHostMode: OrcaAgentHostMode
 
   protected readonly prepareAiVaultSessionResumeFn:
     | ((args: AiVaultPrepareSessionResumeArgs) => Promise<AiVaultPrepareSessionResumeResult>)
