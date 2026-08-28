@@ -137,14 +137,17 @@ export class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends OrcaRuntim
         request.agentArgs !== undefined
           ? request.agentArgs
           : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
-      agentEnv: {
-        ...resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
-        ...(handoffAuthority && request.agent === 'codex'
-          ? { CODEX_HOME: handoffAuthority.providerRoot }
-          : handoffAuthority && request.agent === 'claude'
-            ? { CLAUDE_CONFIG_DIR: handoffAuthority.providerRoot }
-            : {})
-      },
+      agentEnv: this.decorateAgentEnvForClient(
+        {
+          ...resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
+          ...(handoffAuthority && request.agent === 'codex'
+            ? { CODEX_HOME: handoffAuthority.providerRoot }
+            : handoffAuthority && request.agent === 'claude'
+              ? { CLAUDE_CONFIG_DIR: handoffAuthority.providerRoot }
+              : {})
+        },
+        _caller.clientSurface
+      ),
       ompResumeFilePath: request.ompResumeFilePath,
       sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
       platform,
