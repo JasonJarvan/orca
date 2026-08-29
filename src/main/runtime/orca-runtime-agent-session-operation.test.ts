@@ -93,6 +93,13 @@ describe('paired Web agent launch context', () => {
       })
     )
     expect(createTerminal.mock.calls[0]?.[1]?.command).toContain('inspect the runtime')
+    expect(
+      (
+        runtime as unknown as {
+          agentClientContextByPtyId: Map<string, unknown>
+        }
+      ).agentClientContextByPtyId.has('pty-operation')
+    ).toBe(false)
   })
 
   it('does not label a local desktop launch as Web', async () => {
@@ -125,6 +132,13 @@ describe('paired Web agent launch context', () => {
       ORCA_CLIENT_SURFACE: 'web',
       ORCA_HOST_MODE: 'serve'
     })
+    expect(
+      (
+        runtime as unknown as {
+          agentClientContextByPtyId: Map<string, { pending: boolean }>
+        }
+      ).agentClientContextByPtyId.get('pty-operation')?.pending
+    ).toBe(true)
   })
 })
 

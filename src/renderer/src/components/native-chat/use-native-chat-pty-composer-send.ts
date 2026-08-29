@@ -76,37 +76,54 @@ export function useNativeChatPtyComposerSend(args: {
         target.ptyId,
         text,
         imagePaths,
-        sendOptions
+        classification === 'chat' ? { ...sendOptions, agentPrompt: true } : sendOptions
       )
     } else if (text.trim().length > 0) {
-      pendingHandle = sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
+      pendingHandle = sendNativeChatMessage(target.settings, target.ptyId, text, {
+        ...sendOptions,
+        agentPrompt: true
+      })
     } else {
       submitNativeChatPrompt(target.settings, target.ptyId)
     }
-    if (classification !== 'chat') {
-      if (pendingHandle) {
-        args.trackPendingSend(pendingHandle)
+    const completeAcceptedSend = (): void => {
+      if (classification !== 'chat') {
+        if (pendingHandle) {
+          args.trackPendingSend(pendingHandle)
+        }
+        if (classification === 'command') {
+          args.onSlashCommand?.(text.trim())
+          args.sessionOptionsSurface?.recordOutgoingCommand(text.trim())
+        }
+      } else {
+        const pendingId = args.onOptimisticSend?.(text, imagePaths)
+        if (pendingHandle && !pendingHandle.accepted) {
+          args.trackPendingSend(pendingHandle, pendingId)
+        }
       }
-      if (classification === 'command') {
-        args.onSlashCommand?.(text.trim())
-        args.sessionOptionsSurface?.recordOutgoingCommand(text.trim())
-      }
-    } else {
-      const pendingId = args.onOptimisticSend?.(text, imagePaths)
-      if (pendingHandle) {
-        args.trackPendingSend(pendingHandle, pendingId)
-      }
+      emitNativeChatMessageSent({
+        agent: args.agent,
+        runtime: nativeChatComposerTargetIsRemote(target.ptyId) ? 'remote' : 'local'
+      })
+      args.setHistory((previous) => pushHistory(previous, text))
+      args.setDraft('')
+      args.setCaret(0)
+      args.clearSkillOrigin()
+      args.clearImageAttachments()
+      args.setNotice(null)
+      useAppStore.getState().clearNativeChatLaunchDraft(args.terminalTabId)
     }
-    emitNativeChatMessageSent({
-      agent: args.agent,
-      runtime: nativeChatComposerTargetIsRemote(target.ptyId) ? 'remote' : 'local'
-    })
-    args.setHistory((previous) => pushHistory(previous, text))
-    args.setDraft('')
-    args.setCaret(0)
-    args.clearSkillOrigin()
-    args.clearImageAttachments()
-    args.setNotice(null)
-    useAppStore.getState().clearNativeChatLaunchDraft(args.terminalTabId)
+    if (pendingHandle?.accepted) {
+      args.trackPendingSend(pendingHandle)
+      void pendingHandle.accepted.then((accepted) => {
+        if (accepted) {
+          completeAcceptedSend()
+        } else {
+          args.setNotice('Message was not accepted by the remote runtime. Try again.')
+        }
+      })
+      return
+    }
+    completeAcceptedSend()
   }, [args])
 }

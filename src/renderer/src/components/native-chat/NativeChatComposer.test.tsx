@@ -40,7 +40,11 @@ const mocks = vi.hoisted(() => ({
   draft: 'hello',
   imageAttachments: [] as { id: string; path: string }[],
   getMainBufferSnapshot: vi.fn(),
-  sendHandle: { cancel: vi.fn(), settleAfterMs: 500 },
+  sendHandle: {
+    cancel: vi.fn(),
+    settleAfterMs: 500,
+    accepted: undefined as Promise<boolean> | undefined
+  },
   sendNativeChatMessage: vi.fn(),
   sendNativeChatTypedCommand: vi.fn(),
   sendNativeChatMessageVerified: vi.fn(),
@@ -210,6 +214,7 @@ describe('NativeChatComposer', () => {
     mocks.sendNativeChatMessageVerified.mockResolvedValue(true)
     mocks.typeNativeChatCommand.mockResolvedValue(true)
     mocks.sendHandle.settleAfterMs = 500
+    mocks.sendHandle.accepted = undefined
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
@@ -405,6 +410,41 @@ describe('NativeChatComposer', () => {
 
     act(() => mocks.fieldProps?.onSend?.())
 
+    expect(mocks.clearNativeChatLaunchDraft).toHaveBeenCalledWith('tab-1')
+  })
+
+  it('keeps an editable remote draft when semantic submission is rejected', async () => {
+    mocks.sendHandle.accepted = Promise.resolve(false)
+    render(
+      <NativeChatComposer
+        terminalTabId="tab-1"
+        paneKey="tab-1:leaf-1"
+        targetPtyId="remote:env-1@@term-1"
+        agent="codex"
+      />
+    )
+
+    await act(async () => mocks.fieldProps?.onSend?.())
+
+    expect(mocks.setDraft).not.toHaveBeenCalledWith('')
+    expect(mocks.clearNativeChatLaunchDraft).not.toHaveBeenCalled()
+    expect(mocks.trackPendingSend).toHaveBeenCalledWith(mocks.sendHandle)
+  })
+
+  it('clears a remote draft only after semantic submission is accepted', async () => {
+    mocks.sendHandle.accepted = Promise.resolve(true)
+    render(
+      <NativeChatComposer
+        terminalTabId="tab-1"
+        paneKey="tab-1:leaf-1"
+        targetPtyId="remote:env-1@@term-1"
+        agent="codex"
+      />
+    )
+
+    await act(async () => mocks.fieldProps?.onSend?.())
+
+    expect(mocks.setDraft).toHaveBeenCalledWith('')
     expect(mocks.clearNativeChatLaunchDraft).toHaveBeenCalledWith('tab-1')
   })
 

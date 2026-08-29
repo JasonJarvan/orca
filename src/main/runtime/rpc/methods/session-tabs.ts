@@ -56,7 +56,7 @@ export const SESSION_TAB_METHODS: RpcAnyMethod[] = [
       const clientSurface = clientCapabilities?.includes(CLIENT_SURFACE_WEB_RUNTIME_CAPABILITY)
         ? ('web' as const)
         : undefined
-      return runtime.createMobileSessionTerminal(params.worktree, {
+      const created = await runtime.createMobileSessionTerminal(params.worktree, {
         afterTabId: params.afterTabId,
         targetGroupId: params.targetGroupId,
         command: params.command,
@@ -96,6 +96,14 @@ export const SESSION_TAB_METHODS: RpcAnyMethod[] = [
         // of running down the timeout and rolling back a live tab (#7718).
         signal
       })
+      if (
+        clientSurface === 'web' &&
+        params.agentPrompt === undefined &&
+        (params.agent || params.launchAgent)
+      ) {
+        runtime.armAgentClientContextForPty(created.tab.ptyId, clientSurface)
+      }
+      return created
     }
   }),
   defineStreamingMethod({

@@ -121,6 +121,11 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
 
   protected readonly agentPromptExplicitStatusFloorByPtyId = new Map<string, number>()
 
+  protected readonly agentClientContextByPtyId = new Map<
+    string,
+    { generation: number; pending: boolean }
+  >()
+
   protected readonly orchestrationCompatibilitySshAttachments = new Map<
     string,
     OrchestrationCompatibilitySshAttachmentAuthority

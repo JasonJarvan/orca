@@ -12,7 +12,9 @@ describe('Orca agent client context', () => {
     expect(context).toContain('clientSurface=web hostMode=serve')
     expect(context).toContain('no user-operable Electron window')
     expect(context).toContain('Prefer Web UI, Orca CLI/RPC, or server-side configuration')
-    expect(context).toContain('ORCA_* values are diagnostic only')
+    expect(context).toContain('Do not treat an unavailable Electron window as a reason to restart')
+    expect(context).not.toContain('ORCA_*')
+    expect(context).not.toContain('Do not start, stop, or restart')
   })
 
   it('keeps a paired Web UI distinct from a desktop host window', () => {

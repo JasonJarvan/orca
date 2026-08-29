@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sendRuntimePtyInput = vi.fn()
 const sendRuntimePtyInputVerified = vi.fn()
+const sendRuntimeAgentPrompt = vi.fn()
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
+  sendRuntimeAgentPrompt: (...args: unknown[]) => sendRuntimeAgentPrompt(...args),
   sendRuntimePtyInput: (...args: unknown[]) => sendRuntimePtyInput(...args),
   sendRuntimePtyInputVerified: (...args: unknown[]) => sendRuntimePtyInputVerified(...args)
 }))
@@ -35,16 +37,79 @@ const writes = (): string[] => sendRuntimePtyInput.mock.calls.map((call) => call
 
 beforeEach(() => {
   vi.useFakeTimers()
+  vi.stubGlobal('window', {
+    __ORCA_WEB_CLIENT__: true,
+    location: { pathname: '/web-index.html' }
+  })
   sendRuntimePtyInput.mockClear()
   sendRuntimePtyInput.mockReturnValue(true)
+  sendRuntimePtyInputVerified.mockReset()
+  sendRuntimePtyInputVerified.mockResolvedValue(true)
+  sendRuntimeAgentPrompt.mockReset()
+  sendRuntimeAgentPrompt.mockResolvedValue(true)
   resetNativeChatPtySendQueuesForTests()
 })
 afterEach(() => {
+  vi.unstubAllGlobals()
   vi.useRealTimers()
   resetNativeChatPtySendQueuesForTests()
 })
 
 describe('sendNativeChatMessage with a parked multi-line draft', () => {
+  it('keeps the draft raw, then submits the edited Web prompt through one semantic call', async () => {
+    const remotePty = 'remote:env-1@@term-1'
+    const handle = sendNativeChatMessage(SETTINGS, remotePty, 'edited text', {
+      clearInput: buildAgentTuiClearInputForText(DRAFT),
+      confirmCleared: () => true,
+      agentPrompt: true
+    })
+
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS)
+
+    expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(
+      SETTINGS,
+      remotePty,
+      buildAgentTuiClearInputForText(DRAFT)
+    )
+    expect(sendRuntimeAgentPrompt).toHaveBeenCalledWith(SETTINGS, remotePty, 'edited text')
+    expect(sendRuntimePtyInput).not.toHaveBeenCalledWith(
+      SETTINGS,
+      remotePty,
+      expect.stringContaining('edited text')
+    )
+    await expect(handle.accepted).resolves.toBe(true)
+  })
+
+  it('reports a rejected semantic submission without falling back to raw prompt bytes', async () => {
+    sendRuntimeAgentPrompt.mockResolvedValue(false)
+    const remotePty = 'remote:env-1@@term-1'
+    const handle = sendNativeChatMessage(SETTINGS, remotePty, 'edited text', {
+      agentPrompt: true
+    })
+
+    await expect(handle.accepted).resolves.toBe(false)
+    expect(sendRuntimePtyInput).not.toHaveBeenCalledWith(
+      SETTINGS,
+      remotePty,
+      expect.stringContaining('edited text')
+    )
+  })
+
+  it('keeps a remote Electron composer on the existing raw byte path', async () => {
+    ;(window as unknown as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ = false
+    window.location.pathname = '/index.html'
+    const remotePty = 'remote:env-1@@term-1'
+    const handle = sendNativeChatMessage(SETTINGS, remotePty, 'desktop text', {
+      agentPrompt: true
+    })
+
+    expect(handle.accepted).toBeUndefined()
+    expect(sendRuntimeAgentPrompt).not.toHaveBeenCalled()
+    expect(writes()).toContain(buildNativeChatPasteBytes('desktop text'))
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
+    expect(writes()).toContain(NATIVE_CHAT_SUBMIT)
+  })
+
   it('leads with a clear sized to every line of the draft, not one Ctrl+U', () => {
     const clearInput = buildAgentTuiClearInputForText(DRAFT)
     sendNativeChatMessage(SETTINGS, PTY, 'edited text', { clearInput })
@@ -159,6 +224,36 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
 })
 
 describe('image sends with a parked multi-line draft', () => {
+  it('does not claim semantic Agent-prompt delivery for an image-only send', async () => {
+    const handle = sendNativeChatMessageWithImageAttachments(
+      SETTINGS,
+      'remote:env-1@@term-1',
+      '',
+      ['/tmp/a.png'],
+      { agentPrompt: true }
+    )
+
+    await vi.runAllTimersAsync()
+    await handle.settled
+
+    expect(sendRuntimeAgentPrompt).not.toHaveBeenCalled()
+  })
+
+  it('submits an image caption through the semantic Agent-prompt boundary', async () => {
+    const handle = sendNativeChatMessageWithImageAttachments(
+      SETTINGS,
+      'remote:env-1@@term-1',
+      'caption',
+      ['/tmp/a.png'],
+      { agentPrompt: true }
+    )
+
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
+
+    expect(sendRuntimeAgentPrompt).toHaveBeenCalledWith(SETTINGS, 'remote:env-1@@term-1', 'caption')
+    await expect(handle.accepted).resolves.toBe(true)
+  })
+
   it('clears every draft line before pasting, so no line rides along with the image', () => {
     const clearInput = buildAgentTuiClearInputForText(DRAFT)
     sendNativeChatMessageWithImageAttachments(SETTINGS, PTY, 'caption', ['/tmp/a.png'], {

@@ -48,6 +48,20 @@ export class OrcaRuntimeWithGetRuntimeId extends OrcaRuntimeWithHasExactPersiste
       : env
   }
 
+  armAgentClientContextForPty(
+    ptyId: string | null | undefined,
+    clientSurface: RuntimeAgentSessionRpcCaller['clientSurface']
+  ): void {
+    if (!ptyId || clientSurface !== 'web') {
+      return
+    }
+    const generation = this.getPtyLifecycleGeneration(ptyId)
+    if (this.agentClientContextByPtyId.get(ptyId)?.generation === generation) {
+      return
+    }
+    this.agentClientContextByPtyId.set(ptyId, { generation, pending: true })
+  }
+
   resolveOrchestrationWorkerServer(selector: string): OrchestrationWorkerServer {
     return this.orchestrationFederation.resolveWorkerServer(selector)
   }

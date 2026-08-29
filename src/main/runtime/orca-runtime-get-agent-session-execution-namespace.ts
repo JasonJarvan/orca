@@ -179,9 +179,10 @@ export class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends OrcaRuntim
         : {}),
       signal: _caller.signal
     })
-    return {
-      terminal,
-      disposition: terminal.agentSessionDisposition ?? 'created'
+    const disposition = terminal.agentSessionDisposition ?? 'created'
+    if (disposition === 'created') {
+      this.armAgentClientContextForPty(terminal.ptyId, _caller.clientSurface)
     }
+    return { terminal, disposition }
   }
 }

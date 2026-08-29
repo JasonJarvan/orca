@@ -25,11 +25,7 @@ export const TERMINAL_SEND_METHODS: RpcAnyMethod[] = [
       const clientSurface = clientCapabilities?.includes(CLIENT_SURFACE_WEB_RUNTIME_CAPABILITY)
         ? ('web' as const)
         : undefined
-      const text =
-        params.agentPrompt === true && typeof params.text === 'string'
-          ? runtime.decorateAgentPromptForClient(params.text, clientSurface)
-          : params.text
-      await assertTerminalSendTextWithinLimit(text)
+      await assertTerminalSendTextWithinLimit(params.text)
       await assertTerminalSendTextWithinLimit(params.resolvedLaunchDraft?.text)
       if (params.text) {
         await assertLegacyAiVaultResumeCommandAllowed(params.text, () =>
@@ -108,7 +104,7 @@ export const TERMINAL_SEND_METHODS: RpcAnyMethod[] = [
           }
         }
       }
-      const hasText = typeof text === 'string' && text.length > 0
+      const hasText = typeof params.text === 'string' && params.text.length > 0
       const hasSuffix = params.enter === true || params.interrupt === true
       if (params.requireAgentStatus === 'sendable' && hasText && hasSuffix) {
         // Why: guarded sends are two-phase; reject combined payload + submit so a guard flip can't cause partial delivery.
@@ -186,14 +182,15 @@ export const TERMINAL_SEND_METHODS: RpcAnyMethod[] = [
       let result
       try {
         result = useSettledAgentPrompt
-          ? await runtime.sendTerminalAgentPrompt(params.terminal, text!, {
+          ? await runtime.sendTerminalAgentPrompt(params.terminal, params.text!, {
               beforeWrite,
-              signal
+              signal,
+              ...(clientSurface ? { clientSurface } : {})
             })
           : await runtime.sendTerminal(
               params.terminal,
               {
-                text,
+                text: params.text,
                 enter: params.enter === true,
                 interrupt: params.interrupt === true
               },
