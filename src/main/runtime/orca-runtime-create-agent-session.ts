@@ -225,6 +225,9 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
         }
         throw error
       }
+      if (request.promptDelivery === 'draft' || !request.prompt) {
+        this.armAgentClientContextForPty(terminal.ptyId, caller.clientSurface)
+      }
       return { terminal, disposition: 'created' }
     })()
     this.agentSessionCreateOperations.set(operationKey, {

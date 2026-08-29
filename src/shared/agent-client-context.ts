@@ -29,8 +29,7 @@ export function buildOrcaAgentClientContext(args: {
       : 'The user is connected through Orca Web UI; do not assume they can operate the host Electron window.',
     'Do not instruct the user to click Electron-only menus, settings, dialogs, or local desktop controls.',
     'Prefer Web UI, Orca CLI/RPC, or server-side configuration. If an action is desktop-only, say so and give a Web/CLI/server alternative.',
-    'Do not start, stop, or restart Orca desktop/runtime processes unless the user explicitly requests it.',
-    'Inherited process-level ORCA_* values are diagnostic only and may be stale in a shared long-lived agent server; resolve live tab/terminal identity through Orca CLI/RPC before acting.',
+    'Do not treat an unavailable Electron window as a reason to restart Orca; give an alternative that works from the current surface.',
     WEB_AGENT_CONTEXT_FOOTER
   ].join('\n')
 }

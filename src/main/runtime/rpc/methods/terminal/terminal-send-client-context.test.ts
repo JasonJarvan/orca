@@ -27,9 +27,6 @@ function runtimeStub() {
   })
   return {
     getRuntimeId: () => 'runtime-1',
-    decorateAgentPromptForClient: vi.fn((prompt: string, clientSurface?: 'web') =>
-      clientSurface === 'web' ? `<context>web/serve</context>\n\n${prompt}` : prompt
-    ),
     resolveLiveLeafForHandle: () => ({ ptyId: 'pty-1' }),
     getDriver: () => ({ kind: 'desktop' }),
     isTerminalRunningSettledPromptAgent: vi.fn().mockResolvedValue(true),
@@ -39,7 +36,7 @@ function runtimeStub() {
 }
 
 describe('terminal.send paired Web agent context', () => {
-  it('decorates a resumed agent next prompt using authenticated Web client context', async () => {
+  it('passes authenticated Web surface to the semantic Agent prompt boundary', async () => {
     const runtime = runtimeStub()
     const dispatcher = new RpcDispatcher({
       runtime: runtime as unknown as OrcaRuntimeService,
@@ -58,11 +55,10 @@ describe('terminal.send paired Web agent context', () => {
     )
 
     expect(replies[0]).toMatchObject({ ok: true })
-    expect(runtime.decorateAgentPromptForClient).toHaveBeenCalledWith('retry initialization', 'web')
     expect(runtime.sendTerminalAgentPrompt).toHaveBeenCalledWith(
       'term-1',
-      '<context>web/serve</context>\n\nretry initialization',
-      expect.any(Object)
+      'retry initialization',
+      expect.objectContaining({ clientSurface: 'web' })
     )
   })
 
@@ -75,14 +71,10 @@ describe('terminal.send paired Web agent context', () => {
 
     await dispatcher.dispatch(request('retry initialization'))
 
-    expect(runtime.decorateAgentPromptForClient).toHaveBeenCalledWith(
-      'retry initialization',
-      undefined
-    )
     expect(runtime.sendTerminalAgentPrompt).toHaveBeenCalledWith(
       'term-1',
       'retry initialization',
-      expect.any(Object)
+      expect.not.objectContaining({ clientSurface: 'web' })
     )
   })
 })
