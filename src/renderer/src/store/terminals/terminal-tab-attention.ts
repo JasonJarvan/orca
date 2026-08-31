@@ -5,6 +5,7 @@ import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './termin
 type MirroredTerminalTabProps = {
   color?: string | null
   customTitle?: string | null
+  previousCustomTitle?: string | null
 }
 
 function mirrorTerminalTabPropsToRuntime(
@@ -104,6 +105,9 @@ export function createTerminalTabAttentionActions(
       })
     },
     setTabCustomTitle: (tabId, title, opts) => {
+      const previousCustomTitle = Object.values(get().tabsByWorktree)
+        .flat()
+        .find((tab) => tab.id === tabId)?.customTitle
       set((s) => {
         const next = { ...s.tabsByWorktree }
         for (const wId of Object.keys(next)) {
@@ -117,7 +121,10 @@ export function createTerminalTabAttentionActions(
         .find((entry) => entry.contentType === 'terminal' && entry.entityId === tabId)
       if (item) {
         get().setTabCustomLabel(item.id, title, opts)
-        mirrorTerminalTabPropsToRuntime(get, item.id, { customTitle: title })
+        mirrorTerminalTabPropsToRuntime(get, item.id, {
+          customTitle: title,
+          previousCustomTitle: previousCustomTitle ?? null
+        })
       }
     },
     setTabColor: (tabId, color) => {

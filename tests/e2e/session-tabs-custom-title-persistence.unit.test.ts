@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from '../../src/main/runtime/orca-runtime'
 import {
   applyWebSessionTabsSnapshot,
@@ -7,6 +7,10 @@ import {
 import { getDefaultWorkspaceSession } from '../../src/shared/constants'
 import type { RuntimeMobileSessionTabsResult } from '../../src/shared/runtime-types'
 import type { WorkspaceSessionState } from '../../src/shared/workspace-session-state-types'
+import {
+  recordWebSessionCustomTitleIntent,
+  resetWebSessionCustomTitleIntentsForTests
+} from '../../src/renderer/src/runtime/web-session-custom-title-intent'
 
 vi.mock('../../src/renderer/src/store', () => ({
   useAppStore: { setState: vi.fn() }
@@ -139,6 +143,8 @@ function visibleTitle(state: WebSessionTabsSyncState): string | null {
 }
 
 describe('remote Web terminal custom title persistence', () => {
+  afterEach(() => resetWebSessionCustomTitleIntentsForTests())
+
   it('preserves a local rename when an older host omits customTitle', async () => {
     const host = createRuntime(makeSession())
     const legacySnapshot = structuredClone(
@@ -218,5 +224,65 @@ describe('remote Web terminal custom title persistence', () => {
       'web-client-after-restart'
     )
     expect(visibleTitle(afterClear)).toBe('Base terminal')
+  })
+
+  it('does not revert an optimistic rename when a stale snapshot wins the transport race', async () => {
+    const host = createRuntime(makeSession())
+    const staleSnapshot = await host.runtime.listMobileSessionTabs(`id:${WORKTREE_ID}`)
+    const initial = applySnapshot(makeViewerState(), staleSnapshot, 'web-client-a')
+    const localTab = initial.tabsByWorktree[WORKTREE_ID]?.[0]
+    expect(localTab).toBeDefined()
+    const renamed = {
+      ...initial,
+      tabsByWorktree: {
+        ...initial.tabsByWorktree,
+        [WORKTREE_ID]: [{ ...localTab!, customTitle: 'Optimistic rename' }]
+      }
+    }
+    recordWebSessionCustomTitleIntent({
+      owner: { environmentId: 'web-client-a' },
+      worktreeId: WORKTREE_ID,
+      hostTabId: TAB_ID,
+      previousTitle: null,
+      intendedTitle: 'Optimistic rename'
+    })
+
+    expect(visibleTitle(applySnapshot(renamed, staleSnapshot, 'web-client-a'))).toBe(
+      'Optimistic rename'
+    )
+  })
+
+  it('uses sorted tab order for the fallback title after clearing a rename', async () => {
+    const session = makeSession()
+    const target = session.tabsByWorktree[WORKTREE_ID]![0]!
+    target.title = ''
+    target.defaultTitle = ''
+    target.sortOrder = 10
+    target.createdAt = 20
+    session.tabsByWorktree[WORKTREE_ID] = [
+      target,
+      {
+        ...target,
+        id: 'earlier-terminal',
+        ptyId: null,
+        sortOrder: 0,
+        createdAt: 10
+      }
+    ]
+    const host = createRuntime(session)
+
+    await host.runtime.setMobileSessionTabProps(`id:${WORKTREE_ID}`, {
+      tabId: TAB_ID,
+      customTitle: 'Temporary title'
+    })
+    await host.runtime.setMobileSessionTabProps(`id:${WORKTREE_ID}`, {
+      tabId: TAB_ID,
+      customTitle: null
+    })
+
+    const snapshot = await host.runtime.listMobileSessionTabs(`id:${WORKTREE_ID}`)
+    expect(
+      snapshot.tabs.find((tab) => tab.type === 'terminal' && tab.parentTabId === TAB_ID)?.title
+    ).toBe('Terminal 2')
   })
 })

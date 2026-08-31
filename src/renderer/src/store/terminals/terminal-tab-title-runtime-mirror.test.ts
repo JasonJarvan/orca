@@ -46,14 +46,16 @@ describe('terminal custom title runtime mirror', () => {
         {
           worktreeId: 'repo::/worktree',
           tabId: 'unified-1',
-          customTitle: 'Shared build'
+          customTitle: 'Shared build',
+          previousCustomTitle: null
         }
       ],
       [
         {
           worktreeId: 'repo::/worktree',
           tabId: 'unified-1',
-          customTitle: null
+          customTitle: null,
+          previousCustomTitle: 'Shared build'
         }
       ]
     ])

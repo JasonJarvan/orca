@@ -6,6 +6,7 @@ import {
   SetTabProps,
   UpdatePaneLayout
 } from './session-tabs-schemas'
+import { CUSTOM_TAB_TITLE_MAX_LENGTH } from '../../../../shared/custom-tab-title'
 
 const WT = 'id:wt'
 
@@ -88,6 +89,23 @@ describe('SetTabProps.customTitle', () => {
       SetTabProps.parse({ worktree: WT, tabId: 'tab', customTitle: null }).customTitle
     ).toBeNull()
     expect(SetTabProps.parse({ worktree: WT, tabId: 'tab' }).customTitle).toBeUndefined()
+  })
+
+  it('bounds untrusted titles before they reach persisted session state', () => {
+    expect(
+      SetTabProps.safeParse({
+        worktree: WT,
+        tabId: 'tab',
+        customTitle: 'x'.repeat(CUSTOM_TAB_TITLE_MAX_LENGTH)
+      }).success
+    ).toBe(true)
+    expect(
+      SetTabProps.safeParse({
+        worktree: WT,
+        tabId: 'tab',
+        customTitle: 'x'.repeat(CUSTOM_TAB_TITLE_MAX_LENGTH + 1)
+      }).success
+    ).toBe(false)
   })
 })
 
