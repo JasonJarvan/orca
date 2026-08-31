@@ -2,6 +2,31 @@ import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { resolveTerminalWorktreeRoute } from '@/lib/terminal-worktree-route'
 import type { TerminalSlice, TerminalStoreGet, TerminalStoreSet } from './terminal-state'
 
+type MirroredTerminalTabProps = {
+  color?: string | null
+  customTitle?: string | null
+}
+
+function mirrorTerminalTabPropsToRuntime(
+  get: TerminalStoreGet,
+  tabId: string,
+  props: MirroredTerminalTabProps
+): void {
+  const state = get()
+  const owningWorktreeId = Object.keys(state.unifiedTabsByWorktree).find((worktreeId) =>
+    (state.unifiedTabsByWorktree[worktreeId] ?? []).some((entry) => entry.id === tabId)
+  )
+  if (
+    !owningWorktreeId ||
+    !resolveTerminalWorktreeRoute(state, owningWorktreeId)?.runtimeEnvironmentId
+  ) {
+    return
+  }
+  void import('@/runtime/web-runtime-session').then(({ setWebRuntimeTabProps }) =>
+    setWebRuntimeTabProps({ worktreeId: owningWorktreeId, tabId, ...props })
+  )
+}
+
 export function createTerminalTabAttentionActions(
   set: TerminalStoreSet,
   get: TerminalStoreGet
@@ -92,6 +117,7 @@ export function createTerminalTabAttentionActions(
         .find((entry) => entry.contentType === 'terminal' && entry.entityId === tabId)
       if (item) {
         get().setTabCustomLabel(item.id, title, opts)
+        mirrorTerminalTabPropsToRuntime(get, item.id, { customTitle: title })
       }
     },
     setTabColor: (tabId, color) => {
@@ -107,19 +133,7 @@ export function createTerminalTabAttentionActions(
         .find((entry) => entry.contentType === 'terminal' && entry.entityId === tabId)
       if (item) {
         get().setUnifiedTabColor(item.id, color)
-        // Why: tab color is host-authoritative for remote-server tabs; mirror it so it persists instead of reverting on the next snapshot.
-        const state = get()
-        const owningWorktreeId = Object.keys(state.unifiedTabsByWorktree).find((wId) =>
-          (state.unifiedTabsByWorktree[wId] ?? []).some((entry) => entry.id === item.id)
-        )
-        if (
-          owningWorktreeId &&
-          resolveTerminalWorktreeRoute(state, owningWorktreeId)?.runtimeEnvironmentId
-        ) {
-          void import('@/runtime/web-runtime-session').then(({ setWebRuntimeTabProps }) =>
-            setWebRuntimeTabProps({ worktreeId: owningWorktreeId, tabId: item.id, color })
-          )
-        }
+        mirrorTerminalTabPropsToRuntime(get, item.id, { color })
       }
     }
   }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ActivateTab, CloseLifecycleTab, CloseTab, UpdatePaneLayout } from './session-tabs-schemas'
+import {
+  ActivateTab,
+  CloseLifecycleTab,
+  CloseTab,
+  SetTabProps,
+  UpdatePaneLayout
+} from './session-tabs-schemas'
 
 const WT = 'id:wt'
 
@@ -70,6 +76,18 @@ describe('CloseLifecycleTab (session.tabs.closeLifecycle params)', () => {
         terminal: 'term-1'
       }).success
     ).toBe(false)
+  })
+})
+
+describe('SetTabProps.customTitle', () => {
+  it('distinguishes a title update, clear, and unchanged payload', () => {
+    expect(
+      SetTabProps.parse({ worktree: WT, tabId: 'tab', customTitle: 'Build shell' })
+    ).toMatchObject({ customTitle: 'Build shell' })
+    expect(
+      SetTabProps.parse({ worktree: WT, tabId: 'tab', customTitle: null }).customTitle
+    ).toBeNull()
+    expect(SetTabProps.parse({ worktree: WT, tabId: 'tab' }).customTitle).toBeUndefined()
   })
 })
 

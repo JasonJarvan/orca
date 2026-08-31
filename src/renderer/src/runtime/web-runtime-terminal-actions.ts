@@ -231,11 +231,12 @@ export async function updateWebRuntimePaneLayout(args: {
   }
 }
 
-// Why: tab color/pin are host-authoritative; mirror the change so it persists (undefined field = leave as-is on host).
+// Why: tab props are host-authoritative; mirror changes so they persist (undefined = unchanged).
 export function setWebRuntimeTabProps(args: {
   worktreeId: string
   tabId: string
   color?: string | null
+  customTitle?: string | null
   isPinned?: boolean
   viewMode?: 'terminal' | 'chat'
 }): boolean {
@@ -260,6 +261,7 @@ export function setWebRuntimeTabProps(args: {
           worktree: toRuntimeWorktreeSelector(args.worktreeId),
           tabId: hostTabId,
           ...(args.color !== undefined ? { color: args.color } : {}),
+          ...(args.customTitle !== undefined ? { customTitle: args.customTitle } : {}),
           ...(args.isPinned !== undefined ? { isPinned: args.isPinned } : {}),
           ...(args.viewMode !== undefined ? { viewMode: args.viewMode } : {})
         },

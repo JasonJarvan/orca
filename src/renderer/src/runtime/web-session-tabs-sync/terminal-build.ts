@@ -160,6 +160,11 @@ export function buildMirroredTerminalTabs(
     // Why: viewMode echoes back through host snapshots, so prefer the client's record during the echo window and adopt the host value only without a prior tab.
     const hostViewModeSurface = surfaces.find((surface) => surface.viewMode)
     const viewMode = existing ? existing.viewMode : hostViewModeSurface?.viewMode
+    // Missing means an older host; present null/string is the new host's authoritative value.
+    const hostCustomTitleSurface = surfaces.find((surface) => surface.customTitle !== undefined)
+    const customTitle = hostCustomTitleSurface
+      ? (hostCustomTitleSurface.customTitle ?? null)
+      : (existing?.customTitle ?? null)
     return {
       tab: {
         id: localTabId,
@@ -173,7 +178,7 @@ export function buildMirroredTerminalTabs(
         ...(existing?.aiVaultTitle ? { aiVaultTitle: existing.aiVaultTitle } : {}),
         ...(quickCommandLabel ? { quickCommandLabel } : {}),
         ...(startupCwd ? { startupCwd } : {}),
-        customTitle: existing?.customTitle ?? null,
+        customTitle,
         color,
         isPinned,
         ...(viewMode ? { viewMode } : {}),
