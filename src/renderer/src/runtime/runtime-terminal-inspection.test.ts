@@ -49,6 +49,7 @@ function liveEvidence(ptyId: string, processName = 'bash'): RemoteForegroundEvid
 describe('runtime terminal owner routing', () => {
   const runtimeCall = vi.fn()
   const runtimeTransportCall = vi.fn()
+  const runtimeTransportSubscribe = vi.fn()
   const localWrite = vi.fn()
   const localWriteAccepted = vi.fn()
   const localForeground = vi.fn()
@@ -76,7 +77,10 @@ describe('runtime terminal owner routing', () => {
       __ORCA_WEB_CLIENT__: false,
       location: { pathname: '' },
       api: {
-        runtimeEnvironments: { call: runtimeTransportCall },
+        runtimeEnvironments: {
+          call: runtimeTransportCall,
+          subscribe: runtimeTransportSubscribe
+        },
         pty: {
           write: localWrite,
           writeAccepted: localWriteAccepted,
@@ -170,6 +174,37 @@ describe('runtime terminal owner routing', () => {
       timeoutMs: 15_000
     })
     expect(localWrite).not.toHaveBeenCalled()
+  })
+
+  it('cancels an in-flight semantic Agent prompt through the runtime transport', async () => {
+    ;(window as unknown as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ = true
+    useAppStore.setState({
+      runtimeStatusByEnvironmentId: new Map([
+        [
+          'env-1',
+          {
+            status: { capabilities: ['client-surface.web.v1'] }
+          }
+        ]
+      ]) as never
+    })
+    const unsubscribe = vi.fn()
+    runtimeTransportSubscribe.mockResolvedValue({ unsubscribe, sendBinary: vi.fn() })
+    const controller = new AbortController()
+
+    const submission = sendRuntimeAgentPrompt(
+      { activeRuntimeEnvironmentId: 'env-2' },
+      'remote:env-1@@terminal-1',
+      'cancelled draft',
+      controller.signal
+    )
+    expect(submission).not.toBeNull()
+    await vi.waitFor(() => expect(runtimeTransportSubscribe).toHaveBeenCalledOnce())
+
+    controller.abort()
+
+    await expect(submission).rejects.toMatchObject({ name: 'AbortError' })
+    await vi.waitFor(() => expect(unsubscribe).toHaveBeenCalledOnce())
   })
 
   it('leaves local and direct SSH Agent prompts on the existing byte path', () => {
