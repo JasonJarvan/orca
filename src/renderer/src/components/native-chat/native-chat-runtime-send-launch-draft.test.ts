@@ -28,7 +28,7 @@ import {
   AGENT_TUI_CLEAR_INPUT_MAX,
   buildAgentTuiClearInputForText
 } from '../../../../shared/agent-tui-input-clear'
-import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'
+import { cancelNativeChatPtySends, enqueueNativeChatPtySend } from './native-chat-pty-send-queue'
 
 const SETTINGS = {} as Parameters<typeof sendNativeChatMessage>[0]
 const PTY = 'pty-launch-draft'
@@ -56,6 +56,18 @@ afterEach(() => {
   resetNativeChatPtySendQueuesForTests()
 })
 
+it('aborts an unsubmitted queue entry signal when the entry is cancelled', async () => {
+  let entrySignal: AbortSignal | undefined
+  const handle = enqueueNativeChatPtySend(PTY, NATIVE_CHAT_SUBMIT_DELAY_MS, ({ signal }) => {
+    entrySignal = signal
+  })
+
+  handle.cancel()
+
+  expect(entrySignal?.aborted).toBe(true)
+  await handle.settled
+})
+
 describe('sendNativeChatMessage with a parked multi-line draft', () => {
   it('keeps the draft raw, then submits the edited Web prompt through one semantic call', async () => {
     const remotePty = 'remote:env-1@@term-1'
@@ -72,7 +84,12 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
       remotePty,
       buildAgentTuiClearInputForText(DRAFT)
     )
-    expect(sendRuntimeAgentPrompt).toHaveBeenCalledWith(SETTINGS, remotePty, 'edited text')
+    expect(sendRuntimeAgentPrompt).toHaveBeenCalledWith(
+      SETTINGS,
+      remotePty,
+      'edited text',
+      expect.any(AbortSignal)
+    )
     expect(sendRuntimePtyInput).not.toHaveBeenCalledWith(
       SETTINGS,
       remotePty,
@@ -96,8 +113,18 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
     )
   })
 
-  it('settles semantic acceptance when the PTY queue cancels the send internally', async () => {
-    sendRuntimeAgentPrompt.mockReturnValue(new Promise<boolean>(() => {}))
+  it('aborts semantic delivery when the PTY queue cancels the send internally', async () => {
+    let requestSignal: AbortSignal | undefined
+    sendRuntimeAgentPrompt.mockImplementation(
+      (_settings: unknown, _ptyId: unknown, _text: unknown, signal: AbortSignal) => {
+        requestSignal = signal
+        return new Promise<boolean>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('request_aborted')), {
+            once: true
+          })
+        })
+      }
+    )
     const remotePty = 'remote:env-1@@term-1'
     const handle = sendNativeChatMessage(SETTINGS, remotePty, 'edited text', {
       agentPrompt: true
@@ -107,6 +134,7 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
 
     cancelNativeChatPtySends(remotePty)
 
+    expect(requestSignal?.aborted).toBe(true)
     await expect(handle.accepted).resolves.toBe(false)
   })
 
@@ -266,12 +294,27 @@ describe('image sends with a parked multi-line draft', () => {
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
 
-    expect(sendRuntimeAgentPrompt).toHaveBeenCalledWith(SETTINGS, 'remote:env-1@@term-1', 'caption')
+    expect(sendRuntimeAgentPrompt).toHaveBeenCalledWith(
+      SETTINGS,
+      'remote:env-1@@term-1',
+      'caption',
+      expect.any(AbortSignal)
+    )
     await expect(handle.accepted).resolves.toBe(true)
   })
 
-  it('settles image-caption acceptance when the PTY queue cancels internally', async () => {
-    sendRuntimeAgentPrompt.mockReturnValue(new Promise<boolean>(() => {}))
+  it('aborts image-caption delivery when the PTY queue cancels internally', async () => {
+    let requestSignal: AbortSignal | undefined
+    sendRuntimeAgentPrompt.mockImplementation(
+      (_settings: unknown, _ptyId: unknown, _text: unknown, signal: AbortSignal) => {
+        requestSignal = signal
+        return new Promise<boolean>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('request_aborted')), {
+            once: true
+          })
+        })
+      }
+    )
     const remotePty = 'remote:env-1@@term-1'
     const handle = sendNativeChatMessageWithImageAttachments(
       SETTINGS,
@@ -284,6 +327,7 @@ describe('image sends with a parked multi-line draft', () => {
 
     cancelNativeChatPtySends(remotePty)
 
+    expect(requestSignal?.aborted).toBe(true)
     await expect(handle.accepted).resolves.toBe(false)
   })
 

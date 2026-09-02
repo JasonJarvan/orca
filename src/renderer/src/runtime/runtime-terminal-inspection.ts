@@ -280,7 +280,8 @@ export async function sendRuntimePtyInputVerified(
 export function sendRuntimeAgentPrompt(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
-  text: string
+  text: string,
+  signal?: AbortSignal
 ): Promise<boolean> | null {
   const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
   const target = ownerEnvironmentId
@@ -317,7 +318,7 @@ export function sendRuntimeAgentPrompt(
           agentPrompt: true,
           client: DESKTOP_RUNTIME_CLIENT
         },
-        { timeoutMs: 15_000 }
+        { timeoutMs: 15_000, signal }
       )
       if (result.send.accepted !== true) {
         return false

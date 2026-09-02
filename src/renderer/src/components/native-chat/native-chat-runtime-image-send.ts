@@ -59,7 +59,7 @@ export function sendNativeChatMessageWithImageAttachments(
   const queued = enqueueNativeChatPtySend(
     ptyId,
     durationMs,
-    ({ isCancelled, delay, markSubmitted }) => {
+    ({ isCancelled, delay, signal, markSubmitted }) => {
       if (isCancelled()) {
         return
       }
@@ -76,7 +76,7 @@ export function sendNativeChatMessageWithImageAttachments(
         if (trimmedText.length > 0) {
           delay(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS, () => {
             if (semanticRemotePrompt) {
-              const semanticPrompt = sendRuntimeAgentPrompt(settings, ptyId, text)
+              const semanticPrompt = sendRuntimeAgentPrompt(settings, ptyId, text, signal)
               if (!semanticPrompt) {
                 sendRuntimePtyInput(settings, ptyId, buildNativeChatPasteBytes(text))
                 delay(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {

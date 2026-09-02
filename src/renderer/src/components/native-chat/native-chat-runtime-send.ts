@@ -191,7 +191,7 @@ function sendRemoteNativeChatAgentPrompt(
   const queued = enqueueNativeChatPtySend(
     ptyId,
     NATIVE_CHAT_SUBMIT_DELAY_MS + clearConfirmDurationMs(options),
-    ({ isCancelled, delay, markSubmitted }) => {
+    ({ isCancelled, delay, signal, markSubmitted }) => {
       const finish = (value: boolean): void => {
         settleAcceptance(value)
         markSubmitted()
@@ -202,7 +202,7 @@ function sendRemoteNativeChatAgentPrompt(
           return
         }
         try {
-          const semanticPrompt = sendRuntimeAgentPrompt(settings, ptyId, text)
+          const semanticPrompt = sendRuntimeAgentPrompt(settings, ptyId, text, signal)
           if (!semanticPrompt) {
             sendRuntimePtyInput(settings, ptyId, buildNativeChatPasteBytes(text))
             delay(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
