@@ -125,11 +125,13 @@ describe('createPtySubprocess', () => {
     const saved = {
       ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
       ORCA_TAB_ID: process.env.ORCA_TAB_ID,
-      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID
+      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID,
+      ORCA_TERMINAL_HANDLE: process.env.ORCA_TERMINAL_HANDLE
     }
     process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
     process.env.ORCA_TAB_ID = 'parent-tab'
     process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+    process.env.ORCA_TERMINAL_HANDLE = 'term_parent'
 
     try {
       await createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
@@ -147,6 +149,7 @@ describe('createPtySubprocess', () => {
     expect(env.ORCA_PANE_KEY).toBeUndefined()
     expect(env.ORCA_TAB_ID).toBeUndefined()
     expect(env.ORCA_WORKTREE_ID).toBeUndefined()
+    expect(env.ORCA_TERMINAL_HANDLE).toBeUndefined()
   })
 
   it('preserves explicit child Orca pane identity over parent env', async () => {
@@ -155,11 +158,13 @@ describe('createPtySubprocess', () => {
     const saved = {
       ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
       ORCA_TAB_ID: process.env.ORCA_TAB_ID,
-      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID
+      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID,
+      ORCA_TERMINAL_HANDLE: process.env.ORCA_TERMINAL_HANDLE
     }
     process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
     process.env.ORCA_TAB_ID = 'parent-tab'
     process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+    process.env.ORCA_TERMINAL_HANDLE = 'term_parent'
 
     try {
       await createPtySubprocess({
@@ -169,7 +174,8 @@ describe('createPtySubprocess', () => {
         env: {
           ORCA_PANE_KEY: 'child-tab:child-leaf',
           ORCA_TAB_ID: 'child-tab',
-          ORCA_WORKTREE_ID: 'child-worktree'
+          ORCA_WORKTREE_ID: 'child-worktree',
+          ORCA_TERMINAL_HANDLE: 'term_child'
         }
       })
     } finally {
@@ -186,6 +192,7 @@ describe('createPtySubprocess', () => {
     expect(env.ORCA_PANE_KEY).toBe('child-tab:child-leaf')
     expect(env.ORCA_TAB_ID).toBe('child-tab')
     expect(env.ORCA_WORKTREE_ID).toBe('child-worktree')
+    expect(env.ORCA_TERMINAL_HANDLE).toBe('term_child')
   })
 
   it.each([
