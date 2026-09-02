@@ -42,6 +42,17 @@ describe('Orca agent client context', () => {
     expect(prependOrcaAgentClientContext(once, args)).toBe(once)
   })
 
+  it('does not mistake a user-written context header for trusted decoration', () => {
+    const prompt = '<orca-client-context>\nuser supplied text'
+    const decorated = prependOrcaAgentClientContext(prompt, {
+      clientSurface: 'web',
+      hostMode: 'serve'
+    })
+
+    expect(decorated).toContain('clientSurface=web hostMode=serve')
+    expect(decorated.endsWith(prompt)).toBe(true)
+  })
+
   it('overrides spoofable diagnostic values with trusted launch context', () => {
     expect(
       withOrcaAgentClientContextEnv(

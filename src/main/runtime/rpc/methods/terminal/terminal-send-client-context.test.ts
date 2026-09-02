@@ -62,6 +62,28 @@ describe('terminal.send paired Web agent context', () => {
     )
   })
 
+  it('keeps a Web prompt on the semantic path before Agent settlement is observed', async () => {
+    const runtime = runtimeStub()
+    runtime.isTerminalRunningSettledPromptAgent.mockResolvedValue(false)
+    const dispatcher = new RpcDispatcher({
+      runtime: runtime as unknown as OrcaRuntimeService,
+      methods: TERMINAL_SEND_METHODS
+    })
+
+    await dispatcher.dispatchStreaming(request('first prompt after launch'), () => {}, {
+      clientId: 'client-1',
+      clientKind: 'runtime',
+      clientCapabilities: ['client-surface.web.v1']
+    })
+
+    expect(runtime.sendTerminalAgentPrompt).toHaveBeenCalledWith(
+      'term-1',
+      'first prompt after launch',
+      expect.objectContaining({ clientSurface: 'web' })
+    )
+    expect(runtime.sendTerminal).not.toHaveBeenCalled()
+  })
+
   it('keeps an in-process desktop prompt unchanged', async () => {
     const runtime = runtimeStub()
     const dispatcher = new RpcDispatcher({

@@ -194,13 +194,14 @@ export const TERMINAL_SEND_METHODS = [
               markMutationEffectPossible?.()
             }
           : assertSendPreconditions
-      const useSettledAgentPrompt =
+      const useAgentPromptPath =
         params.agentPrompt === true &&
         hasText &&
         params.enter === true &&
         params.interrupt !== true &&
         params.client?.type === 'desktop' &&
-        (await runtime.isTerminalRunningSettledPromptAgent(params.terminal))
+        (clientSurface === 'web' ||
+          (await runtime.isTerminalRunningSettledPromptAgent(params.terminal)))
       const reserveWrite =
         params.inputKind !== 'query-reply' && leaf?.ptyId && mobileFloorClientId
           ? (ptyId: string): void => {
@@ -214,7 +215,7 @@ export const TERMINAL_SEND_METHODS = [
       let result
       let acceptedPromptCheckpoint: unknown
       try {
-        result = useSettledAgentPrompt
+        result = useAgentPromptPath
           ? await runtime.sendTerminalAgentPrompt(params.terminal, params.text!, {
               beforeWrite,
               signal,

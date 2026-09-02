@@ -42,7 +42,7 @@ export function prependOrcaAgentClientContext(
   }
 ): string {
   const context = buildOrcaAgentClientContext(args)
-  if (!context || prompt.startsWith(`${WEB_AGENT_CONTEXT_HEADER}\n`)) {
+  if (!context || prompt.startsWith(`${context}\n\n`)) {
     return prompt
   }
   return `${context}\n\n${prompt}`

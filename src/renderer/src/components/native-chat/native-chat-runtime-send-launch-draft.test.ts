@@ -28,6 +28,7 @@ import {
   AGENT_TUI_CLEAR_INPUT_MAX,
   buildAgentTuiClearInputForText
 } from '../../../../shared/agent-tui-input-clear'
+import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'
 
 const SETTINGS = {} as Parameters<typeof sendNativeChatMessage>[0]
 const PTY = 'pty-launch-draft'
@@ -93,6 +94,20 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
       remotePty,
       expect.stringContaining('edited text')
     )
+  })
+
+  it('settles semantic acceptance when the PTY queue cancels the send internally', async () => {
+    sendRuntimeAgentPrompt.mockReturnValue(new Promise<boolean>(() => {}))
+    const remotePty = 'remote:env-1@@term-1'
+    const handle = sendNativeChatMessage(SETTINGS, remotePty, 'edited text', {
+      agentPrompt: true
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    cancelNativeChatPtySends(remotePty)
+
+    await expect(handle.accepted).resolves.toBe(false)
   })
 
   it('keeps a remote Electron composer on the existing raw byte path', async () => {
@@ -237,6 +252,7 @@ describe('image sends with a parked multi-line draft', () => {
     await handle.settled
 
     expect(sendRuntimeAgentPrompt).not.toHaveBeenCalled()
+    expect(handle.accepted).toBeUndefined()
   })
 
   it('submits an image caption through the semantic Agent-prompt boundary', async () => {
@@ -252,6 +268,23 @@ describe('image sends with a parked multi-line draft', () => {
 
     expect(sendRuntimeAgentPrompt).toHaveBeenCalledWith(SETTINGS, 'remote:env-1@@term-1', 'caption')
     await expect(handle.accepted).resolves.toBe(true)
+  })
+
+  it('settles image-caption acceptance when the PTY queue cancels internally', async () => {
+    sendRuntimeAgentPrompt.mockReturnValue(new Promise<boolean>(() => {}))
+    const remotePty = 'remote:env-1@@term-1'
+    const handle = sendNativeChatMessageWithImageAttachments(
+      SETTINGS,
+      remotePty,
+      'caption',
+      ['/tmp/a.png'],
+      { agentPrompt: true }
+    )
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
+
+    cancelNativeChatPtySends(remotePty)
+
+    await expect(handle.accepted).resolves.toBe(false)
   })
 
   it('clears every draft line before pasting, so no line rides along with the image', () => {

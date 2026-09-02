@@ -252,6 +252,7 @@ function sendRemoteNativeChatAgentPrompt(
       onCancelUnsubmitted: () => clearUnsubmittedAgentInput(settings, ptyId, options)
     }
   )
+  void queued.settled.then(() => settleAcceptance(false))
   return {
     ...queued,
     accepted,
