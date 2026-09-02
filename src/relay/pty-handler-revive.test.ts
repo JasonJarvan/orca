@@ -72,7 +72,8 @@ describe('PtyHandler', () => {
       env: {
         ORCA_PANE_KEY: 'tab-5:1',
         ORCA_TAB_ID: 'tab-5',
-        ORCA_WORKTREE_ID: 'wt-5'
+        ORCA_WORKTREE_ID: 'wt-5',
+        ORCA_TERMINAL_HANDLE: 'term_5'
       }
     })
     const state = (await dispatcher.callRequest('pty.serialize', { ids: [PTY_1] })) as string
@@ -106,6 +107,7 @@ describe('PtyHandler', () => {
     expect(callArgs.env.ORCA_PANE_KEY).toBe('tab-5:1')
     expect(callArgs.env.ORCA_TAB_ID).toBe('tab-5')
     expect(callArgs.env.ORCA_WORKTREE_ID).toBe('wt-5')
+    expect(callArgs.env.ORCA_TERMINAL_HANDLE).toBe('term_5')
     expect(callArgs.env.ORCA_AGENT_HOOK_PORT).toBe('12345')
     expect(callArgs.env.ORCA_AGENT_HOOK_TOKEN).toBe('abc-uuid')
     expect(callArgs.env.TERM).toBe('xterm-256color')

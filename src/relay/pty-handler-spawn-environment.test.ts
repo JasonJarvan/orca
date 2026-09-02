@@ -538,6 +538,55 @@ describe('PtyHandler', () => {
     expect(callArgs.env.ORCA_TAB_ID).toBe('tab-1')
   })
 
+  it('does not inherit another pane identity into a spawn that omits it', async () => {
+    const keys = [
+      'ORCA_PANE_KEY',
+      'ORCA_TAB_ID',
+      'ORCA_WORKTREE_ID',
+      'ORCA_TERMINAL_HANDLE'
+    ] as const
+    const saved = new Map(keys.map((key) => [key, process.env[key]]))
+    process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
+    process.env.ORCA_TAB_ID = 'parent-tab'
+    process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+    process.env.ORCA_TERMINAL_HANDLE = 'term_parent'
+
+    try {
+      await dispatcher.callRequest('pty.spawn', {})
+    } finally {
+      for (const [key, value] of saved) {
+        if (value === undefined) {
+          delete process.env[key]
+        } else {
+          process.env[key] = value
+        }
+      }
+    }
+
+    const env = mockPtySpawn.mock.calls[0]?.[2]?.env as Record<string, string>
+    expect(env.ORCA_PANE_KEY).toBeUndefined()
+    expect(env.ORCA_TAB_ID).toBeUndefined()
+    expect(env.ORCA_WORKTREE_ID).toBeUndefined()
+    expect(env.ORCA_TERMINAL_HANDLE).toBeUndefined()
+  })
+
+  it('preserves the exact pane identity explicitly supplied for a spawn', async () => {
+    await dispatcher.callRequest('pty.spawn', {
+      env: {
+        ORCA_PANE_KEY: 'child-tab:child-leaf',
+        ORCA_TAB_ID: 'child-tab',
+        ORCA_WORKTREE_ID: 'child-worktree',
+        ORCA_TERMINAL_HANDLE: 'term_child'
+      }
+    })
+
+    const env = mockPtySpawn.mock.calls[0]?.[2]?.env as Record<string, string>
+    expect(env.ORCA_PANE_KEY).toBe('child-tab:child-leaf')
+    expect(env.ORCA_TAB_ID).toBe('child-tab')
+    expect(env.ORCA_WORKTREE_ID).toBe('child-worktree')
+    expect(env.ORCA_TERMINAL_HANDLE).toBe('term_child')
+  })
+
   it('passes PTY and explicit launch identity to env augmenters', async () => {
     const seenContexts: {
       id: string
