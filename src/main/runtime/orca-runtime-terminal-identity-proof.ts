@@ -1,4 +1,3 @@
-// @ts-nocheck -- mechanically ported from the pre-split OrcaRuntimeService implementation.
 import { OrcaRuntimeWithRemoveManagedWorktree } from './orca-runtime-remove-managed-worktree'
 import type { ExecutionHostId } from '../../shared/execution-host'
 import type {
@@ -23,6 +22,11 @@ import type {
 } from './terminal-identity-proof-ledger'
 
 export class OrcaRuntimeWithTerminalIdentityProof extends OrcaRuntimeWithRemoveManagedWorktree {
+  // The linear split provides this folder-aware resolver in a successor layer.
+  declare protected readonly resolveTerminalWorkspaceLaunchScope: (
+    selector: string
+  ) => Promise<{ id: string }>
+
   private readonly terminalIdentityProof = new TerminalIdentityProofService({
     runtimeId: this.runtimeId,
     resolveWorktreeId: async (selector) =>
@@ -36,7 +40,7 @@ export class OrcaRuntimeWithTerminalIdentityProof extends OrcaRuntimeWithRemoveM
       this.tryGetWorkspaceSessionHostIdForWorktree(worktreeId),
     getTopologyRevision: (worktreeId) => this.getTerminalTopologyRevision(worktreeId),
     isCandidateEligible: (_worktreeId, terminal) =>
-      terminal.ptyId !== null && this.getLeavesForPty(terminal.ptyId).length > 0,
+      terminal.ptyId !== null && (this.leavesByPtyId.get(terminal.ptyId)?.length ?? 0) > 0,
     captureCandidate: (worktreeId, executionHostId, terminal) =>
       this.captureTerminalIdentityProofCandidate(worktreeId, executionHostId, terminal),
     isCandidateCurrent: (worktreeId, candidate) =>
@@ -98,7 +102,7 @@ export class OrcaRuntimeWithTerminalIdentityProof extends OrcaRuntimeWithRemoveM
     const record = this.handles.get(candidate.handle)
     const pty = this.ptysById.get(candidate.ptyId)
     const leaf = this.leaves.get(makePaneKey(candidate.tabId, candidate.leafId))
-    const leaves = this.getLeavesForPty(candidate.ptyId)
+    const leaves = this.leavesByPtyId.get(candidate.ptyId) ?? []
     if (
       !record ||
       record.runtimeId !== this.runtimeId ||
@@ -124,12 +128,7 @@ export class OrcaRuntimeWithTerminalIdentityProof extends OrcaRuntimeWithRemoveM
     ) {
       return false
     }
-    try {
-      const live = this.getLiveLeafForHandle(candidate.handle)
-      return live.leaf === leaf
-    } catch {
-      return false
-    }
+    return this.resolveLiveLeafForHandle(candidate.handle)?.ptyId === candidate.ptyId
   }
 
   private async readTerminalIdentityProofDelta(
@@ -193,7 +192,11 @@ export class OrcaRuntimeWithTerminalIdentityProof extends OrcaRuntimeWithRemoveM
         continue
       }
       const pty = this.ptysById.get(leaf.ptyId)
-      if (!pty?.connected || !pty.incarnationId || this.getLeavesForPty(leaf.ptyId).length !== 1) {
+      if (
+        !pty?.connected ||
+        !pty.incarnationId ||
+        (this.leavesByPtyId.get(leaf.ptyId)?.length ?? 0) !== 1
+      ) {
         continue
       }
       names.push(
