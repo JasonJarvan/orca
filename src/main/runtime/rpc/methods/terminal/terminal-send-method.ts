@@ -162,13 +162,14 @@ export const TERMINAL_SEND_METHODS: RpcAnyMethod[] = [
       const mobileFloorClientId = resolveMobileFloorClientId(driver, params.client)
       const mobileFloorClaim: MobileInputFloorClaimHolder = { current: null }
       const beforeWrite = assertSendPreconditions
-      const useSettledAgentPrompt =
+      const useAgentPromptPath =
         params.agentPrompt === true &&
         hasText &&
         params.enter === true &&
         params.interrupt !== true &&
         params.client?.type === 'desktop' &&
-        (await runtime.isTerminalRunningSettledPromptAgent(params.terminal))
+        (clientSurface === 'web' ||
+          (await runtime.isTerminalRunningSettledPromptAgent(params.terminal)))
       const reserveWrite =
         params.inputKind !== 'query-reply' && leaf?.ptyId && mobileFloorClientId
           ? (ptyId: string): void => {
@@ -181,7 +182,7 @@ export const TERMINAL_SEND_METHODS: RpcAnyMethod[] = [
           : undefined
       let result
       try {
-        result = useSettledAgentPrompt
+        result = useAgentPromptPath
           ? await runtime.sendTerminalAgentPrompt(params.terminal, params.text!, {
               beforeWrite,
               signal,

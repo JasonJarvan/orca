@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import type { NativeChatLaunchDraft } from '@/lib/native-chat-launch-prompt'
 import { useAppStore } from '../../store'
@@ -42,10 +42,15 @@ export function useNativeChatPtyComposerSend(args: {
   clearImageAttachments: () => void
   setNotice: Dispatch<SetStateAction<string | null>>
 }): () => void {
+  const semanticAcceptancePending = useRef(false)
   return useCallback(() => {
     const text = args.draft
     const imagePaths = args.imageAttachments.map((attachment) => attachment.path)
-    if ((text.trim() === '' && imagePaths.length === 0) || args.disabled) {
+    if (
+      (text.trim() === '' && imagePaths.length === 0) ||
+      args.disabled ||
+      semanticAcceptancePending.current
+    ) {
       return
     }
     // Why: keep option-command and prompt writes from interleaving on the PTY input line.
@@ -114,14 +119,19 @@ export function useNativeChatPtyComposerSend(args: {
       useAppStore.getState().clearNativeChatLaunchDraft(args.terminalTabId)
     }
     if (pendingHandle?.accepted) {
+      semanticAcceptancePending.current = true
       args.trackPendingSend(pendingHandle)
-      void pendingHandle.accepted.then((accepted) => {
-        if (accepted) {
-          completeAcceptedSend()
-        } else {
-          args.setNotice('Message was not accepted by the remote runtime. Try again.')
-        }
-      })
+      void pendingHandle.accepted
+        .then((accepted) => {
+          if (accepted) {
+            completeAcceptedSend()
+          } else {
+            args.setNotice('Message was not accepted by the remote runtime. Try again.')
+          }
+        })
+        .finally(() => {
+          semanticAcceptancePending.current = false
+        })
       return
     }
     completeAcceptedSend()

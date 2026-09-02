@@ -34,7 +34,10 @@ export function sendNativeChatMessageWithImageAttachments(
   }
   const trimmedText = text.trim()
   const semanticRemotePrompt =
-    options?.agentPrompt === true && isWebClientLocation() && ptyId.startsWith('remote:')
+    options?.agentPrompt === true &&
+    trimmedText.length > 0 &&
+    isWebClientLocation() &&
+    ptyId.startsWith('remote:')
   const durationMs =
     (trimmedText.length > 0
       ? NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
@@ -113,6 +116,9 @@ export function sendNativeChatMessageWithImageAttachments(
       onCancelUnsubmitted: () => clearUnsubmittedAgentInput(settings, ptyId, options)
     }
   )
+  if (accepted) {
+    void queued.settled.then(() => settleAcceptance(false))
+  }
   return accepted
     ? {
         ...queued,

@@ -448,6 +448,31 @@ describe('NativeChatComposer', () => {
     expect(mocks.clearNativeChatLaunchDraft).toHaveBeenCalledWith('tab-1')
   })
 
+  it('blocks duplicate remote submits while semantic acceptance is pending', async () => {
+    let resolveAccepted!: (accepted: boolean) => void
+    mocks.sendHandle.accepted = new Promise<boolean>((resolve) => {
+      resolveAccepted = resolve
+    })
+    render(
+      <NativeChatComposer
+        terminalTabId="tab-1"
+        paneKey="tab-1:leaf-1"
+        targetPtyId="remote:env-1@@term-1"
+        agent="codex"
+      />
+    )
+
+    act(() => {
+      mocks.fieldProps?.onSend?.()
+      mocks.fieldProps?.onSend?.()
+    })
+
+    expect(mocks.sendNativeChatMessage).toHaveBeenCalledOnce()
+    await act(() => {
+      resolveAccepted(true)
+    })
+  })
+
   it('keeps the draft scope anchored to the pane while the PTY reconnects', () => {
     const view = render(
       <NativeChatComposer
