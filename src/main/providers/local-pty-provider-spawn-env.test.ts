@@ -564,12 +564,14 @@ describe('LocalPtyProvider', () => {
         ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
         ORCA_TAB_ID: process.env.ORCA_TAB_ID,
         ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID,
-        ORCA_TERMINAL_HANDLE: process.env.ORCA_TERMINAL_HANDLE
+        ORCA_TERMINAL_HANDLE: process.env.ORCA_TERMINAL_HANDLE,
+        ORCA_AGENT_LAUNCH_TOKEN: process.env.ORCA_AGENT_LAUNCH_TOKEN
       }
       process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
       process.env.ORCA_TAB_ID = 'parent-tab'
       process.env.ORCA_WORKTREE_ID = 'parent-worktree'
       process.env.ORCA_TERMINAL_HANDLE = 'term_parent'
+      process.env.ORCA_AGENT_LAUNCH_TOKEN = 'parent-launch-token'
 
       try {
         await provider.spawn({ cols: 80, rows: 24 })
@@ -588,6 +590,7 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.ORCA_TAB_ID).toBeUndefined()
       expect(spawnCall[2].env.ORCA_WORKTREE_ID).toBeUndefined()
       expect(spawnCall[2].env.ORCA_TERMINAL_HANDLE).not.toBe('term_parent')
+      expect(spawnCall[2].env.ORCA_AGENT_LAUNCH_TOKEN).toBeUndefined()
     })
 
     it('preserves explicit child Orca pane identity over parent env', async () => {
@@ -595,12 +598,14 @@ describe('LocalPtyProvider', () => {
         ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
         ORCA_TAB_ID: process.env.ORCA_TAB_ID,
         ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID,
-        ORCA_TERMINAL_HANDLE: process.env.ORCA_TERMINAL_HANDLE
+        ORCA_TERMINAL_HANDLE: process.env.ORCA_TERMINAL_HANDLE,
+        ORCA_AGENT_LAUNCH_TOKEN: process.env.ORCA_AGENT_LAUNCH_TOKEN
       }
       process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
       process.env.ORCA_TAB_ID = 'parent-tab'
       process.env.ORCA_WORKTREE_ID = 'parent-worktree'
       process.env.ORCA_TERMINAL_HANDLE = 'term_parent'
+      process.env.ORCA_AGENT_LAUNCH_TOKEN = 'parent-launch-token'
 
       try {
         await provider.spawn({
@@ -610,7 +615,8 @@ describe('LocalPtyProvider', () => {
             ORCA_PANE_KEY: 'child-tab:child-leaf',
             ORCA_TAB_ID: 'child-tab',
             ORCA_WORKTREE_ID: 'child-worktree',
-            ORCA_TERMINAL_HANDLE: 'term_child'
+            ORCA_TERMINAL_HANDLE: 'term_child',
+            ORCA_AGENT_LAUNCH_TOKEN: 'child-launch-token'
           }
         })
       } finally {
@@ -628,6 +634,7 @@ describe('LocalPtyProvider', () => {
       expect(spawnCall[2].env.ORCA_TAB_ID).toBe('child-tab')
       expect(spawnCall[2].env.ORCA_WORKTREE_ID).toBe('child-worktree')
       expect(spawnCall[2].env.ORCA_TERMINAL_HANDLE).toBe('term_child')
+      expect(spawnCall[2].env.ORCA_AGENT_LAUNCH_TOKEN).toBe('child-launch-token')
     })
   })
 })

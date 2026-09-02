@@ -90,7 +90,9 @@ describe('PtyHandler', () => {
     // Why seeded: a revived pane must not inherit a feature selection from the
     // relay process's own environment.
     const oldShellFeatures = process.env.ORCA_SHELL_FEATURES
+    const oldLaunchToken = process.env.ORCA_AGENT_LAUNCH_TOKEN
     process.env.ORCA_SHELL_FEATURES = 'ready,identity,markers,overlay'
+    process.env.ORCA_AGENT_LAUNCH_TOKEN = 'parent-launch-token'
     try {
       await dispatcher.callRequest('pty.revive', { state })
     } finally {
@@ -98,6 +100,11 @@ describe('PtyHandler', () => {
         delete process.env.ORCA_SHELL_FEATURES
       } else {
         process.env.ORCA_SHELL_FEATURES = oldShellFeatures
+      }
+      if (oldLaunchToken === undefined) {
+        delete process.env.ORCA_AGENT_LAUNCH_TOKEN
+      } else {
+        process.env.ORCA_AGENT_LAUNCH_TOKEN = oldLaunchToken
       }
       killSpy.mockRestore()
     }
@@ -108,6 +115,7 @@ describe('PtyHandler', () => {
     expect(callArgs.env.ORCA_TAB_ID).toBe('tab-5')
     expect(callArgs.env.ORCA_WORKTREE_ID).toBe('wt-5')
     expect(callArgs.env.ORCA_TERMINAL_HANDLE).toBe('term_5')
+    expect(callArgs.env.ORCA_AGENT_LAUNCH_TOKEN).toBeUndefined()
     expect(callArgs.env.ORCA_AGENT_HOOK_PORT).toBe('12345')
     expect(callArgs.env.ORCA_AGENT_HOOK_TOKEN).toBe('abc-uuid')
     expect(callArgs.env.TERM).toBe('xterm-256color')
