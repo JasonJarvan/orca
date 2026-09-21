@@ -134,6 +134,25 @@ describe('pnpm diff format', () => {
     })
   })
 
+  it('strips Git repository-location variables so cwd-targeted git cannot rewrite the caller', () => {
+    const environment = pnpmDiffEnvironment({
+      PATH: '/usr/bin',
+      GIT_DIR: '/other/repo/.git',
+      GIT_WORK_TREE: '/other/repo',
+      GIT_INDEX_FILE: '/tmp/index'
+    })
+    expect(environment.GIT_DIR).toBeUndefined()
+    expect(environment.GIT_WORK_TREE).toBeUndefined()
+    expect(environment.GIT_INDEX_FILE).toBeUndefined()
+    expect(environment.GIT_CONFIG_NOSYSTEM).toBe('1')
+  })
+
+  it('returns the filesystem root when it is the only shared directory', () => {
+    expect(commonParent('/left', '/right', path.posix)).toBe('/')
+    expect(commonParent('C:\\left', 'C:\\right', path.win32)).toBe('C:\\')
+    expect(commonParent('/tmp/a', '/tmp/b', path.posix)).toBe('/tmp')
+  })
+
   it('strips both scratch folder prefixes from headers and index lines', async () => {
     const root = await createDirectory()
     const folderA = path.join(root, 'pristine')

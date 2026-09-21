@@ -180,6 +180,38 @@ describe('xterm IME composition cancellation', () => {
     terminal.dispose()
   })
 
+  it('does not emit delayed latin after Escape cancels a held-Process composition', async () => {
+    const { emitted, terminal, textarea } = openTerminal()
+
+    dispatchCompositionEvent(textarea, 'compositionstart')
+    dispatchCompositionEvent(textarea, 'compositionupdate', 's')
+    textarea.value = 's'
+    await nextEventLoop()
+
+    dispatchShiftProcessKeydown(textarea)
+
+    textarea.value = ''
+    dispatchCompositionEvent(textarea, 'compositionend')
+    await nextEventLoop()
+
+    textarea.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        code: 'Escape',
+        bubbles: true,
+        cancelable: true
+      })
+    )
+    await nextEventLoop()
+
+    textarea.value = 's'
+    dispatchComposedInput(textarea, { data: 's', inputType: 'insertText' })
+    await nextEventLoop()
+
+    expect(emitted.join('')).toBe('')
+    terminal.dispose()
+  })
+
   it('still emits an empty-end commit that delivers text via a following input event', async () => {
     const { emitted, terminal, textarea } = openTerminal()
 

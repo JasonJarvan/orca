@@ -88,7 +88,7 @@ index 497afcf535f3eaca00889525a77e15eb633ccd96..96d499b34605f860608382114c3fbdc0
  
  export interface IBrowser {
 diff --git a/src/browser/input/CompositionHelper.ts b/src/browser/input/CompositionHelper.ts
-index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..dfb769d1270aa6e728a27ffebc55bc40dfacc475 100644
+index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c7907d56e 100644
 --- a/src/browser/input/CompositionHelper.ts
 +++ b/src/browser/input/CompositionHelper.ts
 @@ -1,10 +1,15 @@
@@ -597,7 +597,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..dfb769d1270aa6e728a27ffebc55bc40
  
        // Since composition* events happen before the changes take place in the textarea on most
        // browsers, use a setTimeout with 0ms time to allow the native compositionend event to
-@@ -172,37 +491,338 @@ export class CompositionHelper {
+@@ -172,37 +491,339 @@ export class CompositionHelper {
        // - The last compositionupdate event's data property does not always accurately describe
        //   the character, a counter example being Korean where an ending consonsant can move to
        //   the following character if the following input is a vowel.
@@ -800,6 +800,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..dfb769d1270aa6e728a27ffebc55bc40
 +    this._pendingComposition = undefined;
 +    this._isAwaitingCompositionEnd = false;
 +    this._isComposing = false;
++    this._imeKeydownAwaitingCommit = false;
 +    this._compositionView.classList.remove('active');
 +    this._resetCompositionView();
 +    this._textarea.value =
@@ -962,7 +963,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..dfb769d1270aa6e728a27ffebc55bc40
    /**
     * Apply any changes made to the textarea after the current event chain is allowed to complete.
     * This should be called when not currently composing but a keydown event with the "composition
-@@ -222,6 +842,9 @@ export class CompositionHelper {
+@@ -222,6 +843,9 @@ export class CompositionHelper {
  
          const diff = newValue.replace(oldValue, '');
  
@@ -972,7 +973,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..dfb769d1270aa6e728a27ffebc55bc40
          this._dataAlreadySent = diff;
  
          if (newValue.length > oldValue.length) {
-@@ -236,6 +859,105 @@ export class CompositionHelper {
+@@ -236,6 +860,105 @@ export class CompositionHelper {
      }, 0);
    }
  
@@ -1078,7 +1079,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..dfb769d1270aa6e728a27ffebc55bc40
    /**
     * Positions the composition view on top of the cursor and the textarea just below it (so the
     * IME helper dialog is positioned correctly).
-@@ -243,10 +965,23 @@ export class CompositionHelper {
+@@ -243,10 +966,23 @@ export class CompositionHelper {
     *   necessary as the IME events across browsers are not consistently triggered.
     */
    public updateCompositionElements(dontRecurse?: boolean): void {
@@ -1103,7 +1104,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..dfb769d1270aa6e728a27ffebc55bc40
      if (this._bufferService.buffer.isCursorInViewport) {
        const cursorX = Math.min(this._bufferService.buffer.x, this._bufferService.cols - 1);
  
-@@ -254,31 +989,156 @@ export class CompositionHelper {
+@@ -254,31 +990,156 @@ export class CompositionHelper {
        const cursorTop = this._bufferService.buffer.y * this._renderService.dimensions.css.cell.height;
        const cursorLeft = cursorX * this._renderService.dimensions.css.cell.width;
  

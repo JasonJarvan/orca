@@ -26,7 +26,8 @@ import {
   formatCheckFailure,
   posixRelative,
   normalizePnpmDiff,
-  pnpmDiffEnvironment
+  pnpmDiffEnvironment,
+  withoutGitRepositoryLocation
 } from './xterm-patch-text.mjs'
 
 const DEFAULT_REPO_ROOT = path.resolve(import.meta.dirname, '..', '..')
@@ -168,12 +169,16 @@ const WINDOWS_SHIM_COMMANDS = new Set(['npm', 'npx', 'pnpm', 'yarn'])
 
 function run(command, args, options = {}) {
   const shim = process.platform === 'win32' && WINDOWS_SHIM_COMMANDS.has(command)
+  const { env: providedEnv, ...rest } = options
+  const env =
+    command === 'git' ? withoutGitRepositoryLocation(providedEnv ?? process.env) : providedEnv
   return execFileSync(shim ? `${command}.cmd` : command, args, {
     encoding: 'utf8',
     maxBuffer: 256 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'inherit'],
     shell: shim,
-    ...options
+    ...rest,
+    ...(env ? { env } : {})
   })
 }
 
