@@ -6,6 +6,8 @@
  * tests exercise it with no network and no build.
  */
 
+import path from 'node:path'
+
 /**
  * Flags pnpm@12 passes to `git diff` in its own `diff_folders()`. A patch built
  * with anything else is a patch pnpm may re-diff differently on the next
@@ -48,6 +50,24 @@ export function pnpmDiffEnvironment(baseEnvironment = process.env) {
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null'
   }
+}
+
+export function posixRelative(from, to) {
+  return path.relative(from, to).split(path.sep).join('/')
+}
+
+/** Deepest shared directory of two absolute paths, for `git diff --no-index` relative args. */
+export function commonParent(folderA, folderB) {
+  const left = path.resolve(folderA).split(path.sep)
+  const right = path.resolve(folderB).split(path.sep)
+  const parts = []
+  for (let i = 0; i < Math.min(left.length, right.length); i++) {
+    if (left[i] !== right[i]) {
+      break
+    }
+    parts.push(left[i])
+  }
+  return parts.length > 0 ? parts.join(path.sep) : path.parse(folderA).root
 }
 
 export function escapeRegExp(value) {

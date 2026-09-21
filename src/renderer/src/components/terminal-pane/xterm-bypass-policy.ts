@@ -103,6 +103,11 @@ function isXtermHandledKeyEvent(type: string): boolean {
   return type === 'keydown' || type === 'keyup'
 }
 
+/** Physical Shift used by Windows/Sogou to commit pinyin as Latin (`Process`/`229`). */
+function isImeModeToggleShiftKey(event: XtermBypassEvent): boolean {
+  return typeof event.code === 'string' && event.code.startsWith('Shift')
+}
+
 /**
  * Why: iOS/iPadOS composes CJK text by rewriting the field through
  * `beforeinput`/`input`, with no composition session, and that only runs when
@@ -199,8 +204,13 @@ export function shouldSuppressTerminalImeKeyboardEvent(
   // them corrupts committed CJK text. Bare macOS/Linux keydown 229 is exempt:
   // it must reach xterm's CompositionHelper so it can schedule its textarea
   // diff (macOS: first key after an input-source switch; Linux: Sogou/fcitx
-  // candidate commits outside a composition session). Windows keeps full
-  // suppression until verified against its preedit-diff race.
+  // candidate commits outside a composition session). Windows keeps letter 229
+  // suppression for the preedit-diff race, but ShiftLeft/ShiftRight must pass:
+  // Sogou reports the English-mode toggle as Process/229 with that physical
+  // code, then an empty compositionend and a later latin input.
+  if (isImeModeToggleShiftKey(event)) {
+    return false
+  }
   const passesStandalone229Keydown = isMac || isLinux
   const passesIdleComposing229Keydown =
     event.type === 'keydown' &&

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { Terminal } from '@xterm/xterm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { shouldSuppressTerminalImeKeyboardEvent } from './xterm-bypass-policy'
 
 function nextEventLoop(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, 0))
@@ -48,8 +49,22 @@ function dispatchProcessKeydown(textarea: HTMLTextAreaElement): void {
 
 function dispatchComposedInput(textarea: HTMLTextAreaElement, init: InputEventInit): void {
   const input = new InputEvent('input', { ...init, bubbles: true })
+  // happy-dom may drop InputEventInit.data the same way it drops CompositionEvent.data.
+  Object.defineProperty(input, 'data', { value: init.data ?? null })
   Object.defineProperty(input, 'composed', { value: true })
   textarea.dispatchEvent(input)
+}
+
+function dispatchShiftProcessKeydown(textarea: HTMLTextAreaElement): void {
+  const keydown = new KeyboardEvent('keydown', {
+    key: 'Process',
+    code: 'ShiftLeft',
+    isComposing: true,
+    bubbles: true,
+    cancelable: true
+  })
+  Object.defineProperty(keydown, 'keyCode', { value: 229 })
+  textarea.dispatchEvent(keydown)
 }
 
 function updatePreedit(textarea: HTMLTextAreaElement, text: string): void {
@@ -110,6 +125,58 @@ describe('xterm IME composition cancellation', () => {
     await nextEventLoop()
 
     expect(emitted).toEqual([])
+    terminal.dispose()
+  })
+
+  it('commits Sogou Electron Shift latin while the Process key is still down', async () => {
+    const { emitted, terminal, textarea } = openTerminal()
+    const windowsComposing = {
+      isMac: false,
+      isLinux: false,
+      compositionActive: true,
+      candidateKeyGuardActive: true,
+      pendingCandidateKeyReleaseActive: false
+    }
+    terminal.attachCustomKeyEventHandler(
+      (ev) => !shouldSuppressTerminalImeKeyboardEvent(ev, windowsComposing)
+    )
+
+    dispatchCompositionEvent(textarea, 'compositionstart')
+    dispatchCompositionEvent(textarea, 'compositionupdate', 's')
+    textarea.value = 's'
+    await nextEventLoop()
+
+    dispatchShiftProcessKeydown(textarea)
+
+    textarea.value = ''
+    dispatchCompositionEvent(textarea, 'compositionend')
+    await nextEventLoop()
+    textarea.value = 's'
+    dispatchComposedInput(textarea, { data: 's', inputType: 'insertText' })
+    await nextEventLoop()
+
+    expect(emitted.join('')).toBe('s')
+    terminal.dispose()
+  })
+
+  it('commits delayed latin after empty compositionend with Process key held (no custom handler)', async () => {
+    const { emitted, terminal, textarea } = openTerminal()
+
+    dispatchCompositionEvent(textarea, 'compositionstart')
+    dispatchCompositionEvent(textarea, 'compositionupdate', 's')
+    textarea.value = 's'
+    await nextEventLoop()
+
+    dispatchShiftProcessKeydown(textarea)
+
+    textarea.value = ''
+    dispatchCompositionEvent(textarea, 'compositionend')
+    await nextEventLoop()
+    textarea.value = 's'
+    dispatchComposedInput(textarea, { data: 's', inputType: 'insertText' })
+    await nextEventLoop()
+
+    expect(emitted.join('')).toBe('s')
     terminal.dispose()
   })
 
