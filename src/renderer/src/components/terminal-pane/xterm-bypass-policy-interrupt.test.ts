@@ -241,20 +241,16 @@ describe('shouldSuppressTerminalModifierKeyboardEvent', () => {
     )
   })
 
-  it('still suppresses idle Shift so kitty cannot encode a bare modifier', () => {
+  it('lets every Shift keydown reach CompositionHelper and still swallows the keyup', () => {
+    // Why: Sogou Shift-to-English is often key=Shift after compositionend, with
+    // isComposing already false. Gating on composition state drops the later
+    // held-key insertText (#12099 / #22021). CompositionHelper consumes the
+    // keydown so kitty cannot encode a bare modifier.
     expect(
       shouldSuppressTerminalModifierKeyboardEvent(
         event({ type: 'keydown', key: 'Shift', code: 'ShiftLeft', shiftKey: true })
       )
-    ).toBe(true)
-    expect(
-      shouldSuppressTerminalModifierKeyboardEvent(
-        event({ type: 'keyup', key: 'Shift', code: 'ShiftRight', shiftKey: false })
-      )
-    ).toBe(true)
-  })
-
-  it('lets composing Shift keydown reach CompositionHelper and still swallows the keyup', () => {
+    ).toBe(false)
     expect(
       shouldSuppressTerminalModifierKeyboardEvent(
         event({
@@ -268,39 +264,8 @@ describe('shouldSuppressTerminalModifierKeyboardEvent', () => {
     ).toBe(false)
     expect(
       shouldSuppressTerminalModifierKeyboardEvent(
-        event({
-          type: 'keydown',
-          key: 'Shift',
-          code: 'ShiftLeft',
-          shiftKey: true
-        }),
-        { compositionActive: true }
-      )
-    ).toBe(false)
-    expect(
-      shouldSuppressTerminalModifierKeyboardEvent(
-        event({
-          type: 'keyup',
-          key: 'Shift',
-          code: 'ShiftLeft',
-          shiftKey: false,
-          isComposing: true
-        })
+        event({ type: 'keyup', key: 'Shift', code: 'ShiftRight', shiftKey: false })
       )
     ).toBe(true)
-  })
-
-  it('lets post-compositionend Shift keydown reach CompositionHelper', () => {
-    expect(
-      shouldSuppressTerminalModifierKeyboardEvent(
-        event({
-          type: 'keydown',
-          key: 'Shift',
-          code: 'ShiftLeft',
-          shiftKey: true
-        }),
-        { imeShiftCommitGuardActive: true }
-      )
-    ).toBe(false)
   })
 })

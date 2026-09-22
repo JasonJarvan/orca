@@ -458,7 +458,12 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c
      if (ev.keyCode === 229) {
        // If the "composition character" is used but gets to this point it means a non-composition
        // character (eg. numbers and punctuation) was pressed when the IME was active.
-@@ -138,6 +360,74 @@ export class CompositionHelper {
+@@ -138,6 +360,79 @@ export class CompositionHelper {
++    if (this._isImeModeToggleShift(ev)) {
++      // Consume idle/trailing Shift so kitty cannot encode it; the custom handler
++      // must still deliver the keydown or Sogou's delayed insertText is dropped.
++      return false;
++    }
      return true;
    }
  
