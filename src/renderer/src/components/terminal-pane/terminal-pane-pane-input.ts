@@ -162,7 +162,8 @@ export function installTerminalPaneInputHandling(context: PaneInputContext): voi
     }
     if (
       shouldSuppressTerminalModifierKeyboardEvent(event, {
-        compositionActive: imeKeyboardOptions.compositionActive
+        compositionActive: imeKeyboardOptions.compositionActive,
+        imeShiftCommitGuardActive: imeCompositionTracker.isImeShiftCommitGuardActive()
       })
     ) {
       observeLinuxCandidateEvent()

@@ -6,6 +6,11 @@ export type TerminalImeCompositionTracker = IDisposable & {
    *  IME-owned: during a live composition, and briefly after compositionend to
    *  absorb the committing key's trailing press/release. */
   isCandidateKeyGuardActive: () => boolean
+  /** True while a Windows/Sogou Shift-to-English keydown should reach xterm:
+   *  during a live composition, and briefly after any compositionend. Unlike
+   *  the candidate guard, this is not limited to empty compositionupdate
+   *  engines — Sogou often ends with a non-empty preedit then a trailing Shift. */
+  isImeShiftCommitGuardActive: () => boolean
   /** True when the most recent preedit was Hangul, where a bare digit ends the
    *  syllable as literal text instead of picking a candidate. Expires with the
    *  same staleness window as the other guards. */
@@ -33,6 +38,7 @@ export function installTerminalImeCompositionTracker(
   let active = false
   let lastCompositionEventAt: number | null = null
   let compositionEndedAt: number | null = null
+  let imeShiftCommitGuardUntil: number | null = null
   let sawEmptyCompositionUpdate = false
   // Why the preedit and not compositionend data: a Pinyin IME's preedit is the
   // Latin spelling it is picking candidates for, while its compositionend data
@@ -63,10 +69,19 @@ export function installTerminalImeCompositionTracker(
     )
   }
 
+  const isImeShiftCommitGuardActive = (): boolean => {
+    const at = now()
+    if (isActiveAt(at)) {
+      return true
+    }
+    return imeShiftCommitGuardUntil !== null && at <= imeShiftCommitGuardUntil
+  }
+
   if (!terminalElement) {
     return {
       isActive: () => active,
       isCandidateKeyGuardActive,
+      isImeShiftCommitGuardActive,
       isHangulPreedit: () => isHangulPreeditAt(now()),
       dispose: () => undefined
     }
@@ -76,6 +91,7 @@ export function installTerminalImeCompositionTracker(
     active = true
     lastCompositionEventAt = now()
     compositionEndedAt = null
+    imeShiftCommitGuardUntil = null
     sawEmptyCompositionUpdate = false
     // Why safe: the following compositionupdate re-reads the preedit script.
     hangulPreedit = false
@@ -100,6 +116,10 @@ export function installTerminalImeCompositionTracker(
     // Why: only Sogou/fcitx-style empty updates prove a trailing plain
     // Space/digit is likely IME-owned; broad post-end guards drop real typing.
     compositionEndedAt = sawEmptyCompositionUpdate ? now() : null
+    // Why: Sogou Shift-to-English often arrives after compositionend with
+    // isComposing already false. Arm even without empty updates so that
+    // trailing Shift is not treated as an idle kitty modifier.
+    imeShiftCommitGuardUntil = now() + TERMINAL_IME_CANDIDATE_GUARD_POST_COMPOSITION_MS
     sawEmptyCompositionUpdate = false
   }
   const handleInput = (event: Event): void => {
@@ -116,6 +136,7 @@ export function installTerminalImeCompositionTracker(
     active = false
     lastCompositionEventAt = null
     compositionEndedAt = null
+    imeShiftCommitGuardUntil = null
     sawEmptyCompositionUpdate = false
     hangulPreedit = false
   }
@@ -129,6 +150,7 @@ export function installTerminalImeCompositionTracker(
   return {
     isActive: () => isActiveAt(now()),
     isCandidateKeyGuardActive,
+    isImeShiftCommitGuardActive,
     isHangulPreedit: () => isHangulPreeditAt(now()),
     dispose: () => {
       terminalElement.removeEventListener('compositionstart', markActive, true)

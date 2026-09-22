@@ -323,6 +323,7 @@ export function shouldSuppressTerminalInterruptKeyup(event: XtermBypassEvent): b
 
 export type XtermModifierKeyboardOptions = {
   compositionActive?: boolean
+  imeShiftCommitGuardActive?: boolean
 }
 
 export function shouldSuppressTerminalModifierKeyboardEvent(
@@ -333,15 +334,19 @@ export function shouldSuppressTerminalModifierKeyboardEvent(
     return false
   }
   // Why: idle Shift must stay suppressed so kitty does not encode a bare
-  // modifier. Windows Sogou Shift-to-English is often key=Shift while
-  // composing; swallowing that keydown returns false from the custom handler
-  // after xterm has already set _keyDownSeen, so CompositionHelper never sees
-  // it and the later held-key insertText is dropped (#12099 / #22021).
+  // modifier. Windows Sogou Shift-to-English is often key=Shift after
+  // compositionend, with isComposing already false. Swallowing that keydown
+  // returns false from the custom handler after xterm has already set
+  // _keyDownSeen, so CompositionHelper never sees it and the later held-key
+  // insertText is dropped (#12099 / #22021).
   // Keyup stays suppressed: _keyUp clears _keyDownSeen before the handler.
   return !(
     event.type === 'keydown' &&
     event.key === 'Shift' &&
-    (event.isComposing === true || event.keyCode === 229 || options?.compositionActive === true)
+    (event.isComposing === true ||
+      event.keyCode === 229 ||
+      options?.compositionActive === true ||
+      options?.imeShiftCommitGuardActive === true)
   )
 }
 

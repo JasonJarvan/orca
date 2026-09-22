@@ -70,11 +70,11 @@ function dispatchShiftProcessKeydown(textarea: HTMLTextAreaElement): void {
   textarea.dispatchEvent(keydown)
 }
 
-function dispatchOrdinaryShiftKeydown(textarea: HTMLTextAreaElement): void {
+function dispatchOrdinaryShiftKeydown(textarea: HTMLTextAreaElement, isComposing = true): void {
   const keydown = new KeyboardEvent('keydown', {
     key: 'Shift',
     code: 'ShiftLeft',
-    isComposing: true,
+    isComposing,
     bubbles: true,
     cancelable: true,
     shiftKey: true
@@ -93,7 +93,8 @@ function attachPaneInputKeyHandler(
     }
     if (
       shouldSuppressTerminalModifierKeyboardEvent(ev, {
-        compositionActive: windowsComposing.compositionActive
+        compositionActive: windowsComposing.compositionActive,
+        imeShiftCommitGuardActive: true
       })
     ) {
       return false
@@ -215,6 +216,34 @@ describe('xterm IME composition cancellation', () => {
     textarea.value = ''
     dispatchCompositionEvent(textarea, 'compositionend')
     await nextEventLoop()
+    textarea.value = 's'
+    dispatchComposedInput(textarea, { data: 's', inputType: 'insertText' })
+    await nextEventLoop()
+
+    expect(emitted.join('')).toBe('s')
+    terminal.dispose()
+  })
+
+  it('commits Sogou Shift latin when ordinary Shift arrives after empty compositionend', async () => {
+    const { emitted, terminal, textarea } = openTerminal()
+    const windowsPostComposition = {
+      isMac: false,
+      isLinux: false,
+      compositionActive: false,
+      candidateKeyGuardActive: false,
+      pendingCandidateKeyReleaseActive: false
+    }
+    attachPaneInputKeyHandler(terminal, windowsPostComposition)
+
+    dispatchCompositionEvent(textarea, 'compositionstart')
+    dispatchCompositionEvent(textarea, 'compositionupdate', 's')
+    textarea.value = 's'
+    await nextEventLoop()
+
+    textarea.value = ''
+    dispatchCompositionEvent(textarea, 'compositionend')
+    await nextEventLoop()
+    dispatchOrdinaryShiftKeydown(textarea, false)
     textarea.value = 's'
     dispatchComposedInput(textarea, { data: 's', inputType: 'insertText' })
     await nextEventLoop()

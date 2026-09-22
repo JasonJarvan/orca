@@ -154,10 +154,42 @@ describe('installTerminalImeCompositionTracker', () => {
     })
   })
 
+  describe('IME Shift commit guard', () => {
+    it('stays active after compositionend even without empty compositionupdate', () => {
+      const harness = installTracker()
+      harness.composition('compositionstart', '')
+      harness.composition('compositionupdate', 's')
+      harness.composition('compositionend', '')
+      expect(harness.tracker.isActive()).toBe(false)
+      expect(harness.tracker.isCandidateKeyGuardActive()).toBe(false)
+      expect(harness.tracker.isImeShiftCommitGuardActive()).toBe(true)
+    })
+
+    it('survives the delayed latin insertText so a trailing Shift can still land', () => {
+      const harness = installTracker()
+      harness.composition('compositionstart', '')
+      harness.composition('compositionupdate', 's')
+      harness.composition('compositionend', '')
+      harness.input('insertText')
+      expect(harness.tracker.isImeShiftCommitGuardActive()).toBe(true)
+    })
+
+    it('expires after the post-composition window', () => {
+      const harness = installTracker()
+      harness.composition('compositionstart', '')
+      harness.composition('compositionend', '')
+      harness.advance(TERMINAL_IME_CANDIDATE_GUARD_POST_COMPOSITION_MS)
+      expect(harness.tracker.isImeShiftCommitGuardActive()).toBe(true)
+      harness.advance(1)
+      expect(harness.tracker.isImeShiftCommitGuardActive()).toBe(false)
+    })
+  })
+
   it('handles a missing terminal element', () => {
     const tracker = installTerminalImeCompositionTracker(null)
     expect(tracker.isActive()).toBe(false)
     expect(tracker.isCandidateKeyGuardActive()).toBe(false)
+    expect(tracker.isImeShiftCommitGuardActive()).toBe(false)
     expect(() => tracker.dispose()).not.toThrow()
   })
 

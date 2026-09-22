@@ -289,4 +289,18 @@ describe('shouldSuppressTerminalModifierKeyboardEvent', () => {
       )
     ).toBe(true)
   })
+
+  it('lets post-compositionend Shift keydown reach CompositionHelper', () => {
+    expect(
+      shouldSuppressTerminalModifierKeyboardEvent(
+        event({
+          type: 'keydown',
+          key: 'Shift',
+          code: 'ShiftLeft',
+          shiftKey: true
+        }),
+        { imeShiftCommitGuardActive: true }
+      )
+    ).toBe(false)
+  })
 })
