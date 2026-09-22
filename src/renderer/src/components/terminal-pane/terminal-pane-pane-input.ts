@@ -160,7 +160,11 @@ export function installTerminalPaneInputHandling(context: PaneInputContext): voi
       observeLinuxCandidateEvent()
       return false
     }
-    if (shouldSuppressTerminalModifierKeyboardEvent(event)) {
+    if (
+      shouldSuppressTerminalModifierKeyboardEvent(event, {
+        compositionActive: imeKeyboardOptions.compositionActive
+      })
+    ) {
       observeLinuxCandidateEvent()
       return false
     }

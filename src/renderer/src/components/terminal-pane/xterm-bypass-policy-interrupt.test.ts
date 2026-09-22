@@ -240,4 +240,53 @@ describe('shouldSuppressTerminalModifierKeyboardEvent', () => {
       false
     )
   })
+
+  it('still suppresses idle Shift so kitty cannot encode a bare modifier', () => {
+    expect(
+      shouldSuppressTerminalModifierKeyboardEvent(
+        event({ type: 'keydown', key: 'Shift', code: 'ShiftLeft', shiftKey: true })
+      )
+    ).toBe(true)
+    expect(
+      shouldSuppressTerminalModifierKeyboardEvent(
+        event({ type: 'keyup', key: 'Shift', code: 'ShiftRight', shiftKey: false })
+      )
+    ).toBe(true)
+  })
+
+  it('lets composing Shift keydown reach CompositionHelper and still swallows the keyup', () => {
+    expect(
+      shouldSuppressTerminalModifierKeyboardEvent(
+        event({
+          type: 'keydown',
+          key: 'Shift',
+          code: 'ShiftLeft',
+          shiftKey: true,
+          isComposing: true
+        })
+      )
+    ).toBe(false)
+    expect(
+      shouldSuppressTerminalModifierKeyboardEvent(
+        event({
+          type: 'keydown',
+          key: 'Shift',
+          code: 'ShiftLeft',
+          shiftKey: true
+        }),
+        { compositionActive: true }
+      )
+    ).toBe(false)
+    expect(
+      shouldSuppressTerminalModifierKeyboardEvent(
+        event({
+          type: 'keyup',
+          key: 'Shift',
+          code: 'ShiftLeft',
+          shiftKey: false,
+          isComposing: true
+        })
+      )
+    ).toBe(true)
+  })
 })

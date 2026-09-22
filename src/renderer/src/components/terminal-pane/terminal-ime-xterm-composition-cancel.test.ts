@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 import { Terminal } from '@xterm/xterm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { shouldSuppressTerminalImeKeyboardEvent } from './xterm-bypass-policy'
+import {
+  shouldSuppressTerminalImeKeyboardEvent,
+  shouldSuppressTerminalModifierKeyboardEvent
+} from './xterm-bypass-policy'
 
 function nextEventLoop(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, 0))
@@ -65,6 +68,38 @@ function dispatchShiftProcessKeydown(textarea: HTMLTextAreaElement): void {
   })
   Object.defineProperty(keydown, 'keyCode', { value: 229 })
   textarea.dispatchEvent(keydown)
+}
+
+function dispatchOrdinaryShiftKeydown(textarea: HTMLTextAreaElement): void {
+  const keydown = new KeyboardEvent('keydown', {
+    key: 'Shift',
+    code: 'ShiftLeft',
+    isComposing: true,
+    bubbles: true,
+    cancelable: true,
+    shiftKey: true
+  })
+  Object.defineProperty(keydown, 'keyCode', { value: 16 })
+  textarea.dispatchEvent(keydown)
+}
+
+function attachPaneInputKeyHandler(
+  terminal: Terminal,
+  windowsComposing: Parameters<typeof shouldSuppressTerminalImeKeyboardEvent>[1]
+): void {
+  terminal.attachCustomKeyEventHandler((ev) => {
+    if (shouldSuppressTerminalImeKeyboardEvent(ev, windowsComposing)) {
+      return false
+    }
+    if (
+      shouldSuppressTerminalModifierKeyboardEvent(ev, {
+        compositionActive: windowsComposing.compositionActive
+      })
+    ) {
+      return false
+    }
+    return true
+  })
 }
 
 function updatePreedit(textarea: HTMLTextAreaElement, text: string): void {
@@ -147,6 +182,35 @@ describe('xterm IME composition cancellation', () => {
     await nextEventLoop()
 
     dispatchShiftProcessKeydown(textarea)
+
+    textarea.value = ''
+    dispatchCompositionEvent(textarea, 'compositionend')
+    await nextEventLoop()
+    textarea.value = 's'
+    dispatchComposedInput(textarea, { data: 's', inputType: 'insertText' })
+    await nextEventLoop()
+
+    expect(emitted.join('')).toBe('s')
+    terminal.dispose()
+  })
+
+  it('commits Sogou Shift latin when the pane handler would otherwise swallow Shift', async () => {
+    const { emitted, terminal, textarea } = openTerminal()
+    const windowsComposing = {
+      isMac: false,
+      isLinux: false,
+      compositionActive: true,
+      candidateKeyGuardActive: true,
+      pendingCandidateKeyReleaseActive: false
+    }
+    attachPaneInputKeyHandler(terminal, windowsComposing)
+
+    dispatchCompositionEvent(textarea, 'compositionstart')
+    dispatchCompositionEvent(textarea, 'compositionupdate', 's')
+    textarea.value = 's'
+    await nextEventLoop()
+
+    dispatchOrdinaryShiftKeydown(textarea)
 
     textarea.value = ''
     dispatchCompositionEvent(textarea, 'compositionend')
