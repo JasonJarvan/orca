@@ -91,7 +91,12 @@ function attachPaneInputKeyHandler(
     if (shouldSuppressTerminalImeKeyboardEvent(ev, windowsComposing)) {
       return false
     }
-    if (shouldSuppressTerminalModifierKeyboardEvent(ev)) {
+    if (
+      shouldSuppressTerminalModifierKeyboardEvent(ev, {
+        isMac: windowsComposing.isMac,
+        isLinux: windowsComposing.isLinux
+      })
+    ) {
       return false
     }
     return true

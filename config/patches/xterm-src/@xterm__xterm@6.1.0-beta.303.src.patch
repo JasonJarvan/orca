@@ -88,7 +88,7 @@ index 497afcf535f3eaca00889525a77e15eb633ccd96..96d499b34605f860608382114c3fbdc0
  
  export interface IBrowser {
 diff --git a/src/browser/input/CompositionHelper.ts b/src/browser/input/CompositionHelper.ts
-index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c7907d56e 100644
+index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..b2d99074a17a2197fc50091a1a2f760c27ece99f 100644
 --- a/src/browser/input/CompositionHelper.ts
 +++ b/src/browser/input/CompositionHelper.ts
 @@ -1,10 +1,15 @@
@@ -458,15 +458,18 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c
      if (ev.keyCode === 229) {
        // If the "composition character" is used but gets to this point it means a non-composition
        // character (eg. numbers and punctuation) was pressed when the IME was active.
-@@ -138,6 +360,79 @@ export class CompositionHelper {
+@@ -135,6 +357,79 @@ export class CompositionHelper {
+       return false;
+     }
+ 
 +    if (this._isImeModeToggleShift(ev)) {
 +      // Consume idle/trailing Shift so kitty cannot encode it; the custom handler
 +      // must still deliver the keydown or Sogou's delayed insertText is dropped.
 +      return false;
 +    }
-     return true;
-   }
- 
++    return true;
++  }
++
 +  /**
 +   * Defers keypress text while a composition finalizer is pending so all input is emitted once
 +   * after reconciliation with the final textarea candidate.
@@ -532,13 +535,10 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c
 +      this._textareaChangeTimer = undefined;
 +    }
 +    this._coreService.triggerDataEvent(text, true);
-+    return true;
-+  }
-+
-   /**
-    * Finalizes the composition, resuming regular input actions. This is called when a composition
-    * is ending.
-@@ -146,23 +436,52 @@ export class CompositionHelper {
+     return true;
+   }
+ 
+@@ -146,23 +441,52 @@ export class CompositionHelper {
     *   compositionend event is triggered, such as enter, so that the composition is sent before
     *   the command is executed.
     */
@@ -602,7 +602,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c
  
        // Since composition* events happen before the changes take place in the textarea on most
        // browsers, use a setTimeout with 0ms time to allow the native compositionend event to
-@@ -172,37 +491,339 @@ export class CompositionHelper {
+@@ -172,37 +496,339 @@ export class CompositionHelper {
        // - The last compositionupdate event's data property does not always accurately describe
        //   the character, a counter example being Korean where an ending consonsant can move to
        //   the following character if the following input is a vowel.
@@ -968,7 +968,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c
    /**
     * Apply any changes made to the textarea after the current event chain is allowed to complete.
     * This should be called when not currently composing but a keydown event with the "composition
-@@ -222,6 +843,9 @@ export class CompositionHelper {
+@@ -222,6 +848,9 @@ export class CompositionHelper {
  
          const diff = newValue.replace(oldValue, '');
  
@@ -978,7 +978,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c
          this._dataAlreadySent = diff;
  
          if (newValue.length > oldValue.length) {
-@@ -236,6 +860,105 @@ export class CompositionHelper {
+@@ -236,6 +865,105 @@ export class CompositionHelper {
      }, 0);
    }
  
@@ -1084,7 +1084,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c
    /**
     * Positions the composition view on top of the cursor and the textarea just below it (so the
     * IME helper dialog is positioned correctly).
-@@ -243,10 +966,23 @@ export class CompositionHelper {
+@@ -243,10 +971,23 @@ export class CompositionHelper {
     *   necessary as the IME events across browsers are not consistently triggered.
     */
    public updateCompositionElements(dontRecurse?: boolean): void {
@@ -1109,7 +1109,7 @@ index c9ec396ab66cb966d49aa63bed09cdf9cd6c4246..3f0ca65040d6647f35fe4e0a608d157c
      if (this._bufferService.buffer.isCursorInViewport) {
        const cursorX = Math.min(this._bufferService.buffer.x, this._bufferService.cols - 1);
  
-@@ -254,31 +990,156 @@ export class CompositionHelper {
+@@ -254,31 +995,156 @@ export class CompositionHelper {
        const cursorTop = this._bufferService.buffer.y * this._renderService.dimensions.css.cell.height;
        const cursorLeft = cursorX * this._renderService.dimensions.css.cell.width;
  

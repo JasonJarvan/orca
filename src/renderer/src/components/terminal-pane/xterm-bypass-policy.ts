@@ -324,7 +324,16 @@ export function shouldSuppressTerminalInterruptKeyup(event: XtermBypassEvent): b
   )
 }
 
-export function shouldSuppressTerminalModifierKeyboardEvent(event: XtermBypassEvent): boolean {
+/** The platform split the Windows Sogou Shift carve-out needs; see below. */
+export type XtermModifierKeyboardOptions = {
+  isMac: boolean
+  isLinux: boolean
+}
+
+export function shouldSuppressTerminalModifierKeyboardEvent(
+  event: XtermBypassEvent,
+  options: XtermModifierKeyboardOptions
+): boolean {
   if (!isXtermHandledKeyEvent(event.type) || !TERMINAL_MODIFIER_KEYS.has(event.key)) {
     return false
   }
@@ -334,9 +343,12 @@ export function shouldSuppressTerminalModifierKeyboardEvent(event: XtermBypassEv
   // keydown drops the later held-key insertText (#12099 / #22021). Gating the
   // keydown on those flags was tried and dropped the commit on native Sogou.
   // Keyup stays suppressed so kitty cannot encode a bare modifier release.
-  // CompositionHelper.keydown consumes the Shift keydown itself, which is what
-  // keeps an idle Shift from becoming a kitty press CSI-u.
-  return !(event.type === 'keydown' && event.key === 'Shift')
+  // Windows-only: on macOS and Linux the pane handler still swallows Shift
+  // before xterm, so neither platform depends on CompositionHelper consuming
+  // it — the one thing standing between a delivered Shift and a kitty press
+  // CSI-u, and it lives in the vendored patch.
+  const isWindows = !options.isMac && !options.isLinux
+  return !(isWindows && event.type === 'keydown' && event.key === 'Shift')
 }
 
 /**
