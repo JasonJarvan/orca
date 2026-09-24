@@ -10,14 +10,14 @@ function nextEventLoop(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, 0))
 }
 
-function openTerminal(): {
+function openTerminal(options?: ConstructorParameters<typeof Terminal>[0]): {
   emitted: string[]
   terminal: Terminal
   textarea: HTMLTextAreaElement
 } {
   const container = document.createElement('div')
   document.body.appendChild(container)
-  const terminal = new Terminal()
+  const terminal = new Terminal(options)
   terminal.open(container)
   const textarea = terminal.textarea
   if (!textarea) {
@@ -91,12 +91,7 @@ function attachPaneInputKeyHandler(
     if (shouldSuppressTerminalImeKeyboardEvent(ev, windowsComposing)) {
       return false
     }
-    if (
-      shouldSuppressTerminalModifierKeyboardEvent(ev, {
-        compositionActive: windowsComposing.compositionActive,
-        imeShiftCommitGuardActive: true
-      })
-    ) {
+    if (shouldSuppressTerminalModifierKeyboardEvent(ev)) {
       return false
     }
     return true
@@ -321,6 +316,67 @@ describe('xterm IME composition cancellation', () => {
     await nextEventLoop()
 
     expect(emitted.join('')).toBe('한')
+    terminal.dispose()
+  })
+
+  it('emits no kitty CSI-u for an idle Shift keydown under report-all-keys', async () => {
+    // Why: idle Shift keydown is delivered so Sogou's post-compositionend commit
+    // can land. CompositionHelper has to consume it; otherwise kitty encodes a
+    // bare modifier press when REPORT_ALL_KEYS_AS_ESCAPE_CODES is on.
+    const { emitted, terminal, textarea } = openTerminal({
+      vtExtensions: { kittyKeyboard: true }
+    })
+    const windowsIdle = {
+      isMac: false,
+      isLinux: false,
+      compositionActive: false,
+      candidateKeyGuardActive: false,
+      pendingCandidateKeyReleaseActive: false
+    }
+    attachPaneInputKeyHandler(terminal, windowsIdle)
+    terminal.write('\x1b[=8u\x1b[?u')
+    await nextEventLoop()
+    expect(emitted.join('')).toBe('\x1b[?8u')
+    emitted.length = 0
+
+    dispatchOrdinaryShiftKeydown(textarea, false)
+    await nextEventLoop()
+
+    expect(emitted).toEqual([])
+    terminal.dispose()
+  })
+
+  it('emits no kitty release for a Sogou Shift-coded Process keyup', async () => {
+    // Why: REPORT_EVENT_TYPES forces a release CSI-u. The keyup must be
+    // suppressed before xterm's encoder; the held latin commit does not need it.
+    const { emitted, terminal, textarea } = openTerminal({
+      vtExtensions: { kittyKeyboard: true }
+    })
+    const windowsComposing = {
+      isMac: false,
+      isLinux: false,
+      compositionActive: true,
+      candidateKeyGuardActive: true,
+      pendingCandidateKeyReleaseActive: false
+    }
+    attachPaneInputKeyHandler(terminal, windowsComposing)
+    terminal.write('\x1b[=2u\x1b[?u')
+    await nextEventLoop()
+    expect(emitted.join('')).toBe('\x1b[?2u')
+    emitted.length = 0
+
+    const keyup = new KeyboardEvent('keyup', {
+      key: 'Process',
+      code: 'ShiftRight',
+      isComposing: true,
+      bubbles: true,
+      cancelable: true
+    })
+    Object.defineProperty(keyup, 'keyCode', { value: 229 })
+    textarea.dispatchEvent(keyup)
+    await nextEventLoop()
+
+    expect(emitted).toEqual([])
     terminal.dispose()
   })
 })

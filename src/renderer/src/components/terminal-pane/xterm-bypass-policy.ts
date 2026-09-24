@@ -205,10 +205,13 @@ export function shouldSuppressTerminalImeKeyboardEvent(
   // it must reach xterm's CompositionHelper so it can schedule its textarea
   // diff (macOS: first key after an input-source switch; Linux: Sogou/fcitx
   // candidate commits outside a composition session). Windows keeps letter 229
-  // suppression for the preedit-diff race, but ShiftLeft/ShiftRight must pass:
-  // Sogou reports the English-mode toggle as Process/229 with that physical
-  // code, then an empty compositionend and a later latin input.
-  if (isImeModeToggleShiftKey(event)) {
+  // suppression for the preedit-diff race, but a ShiftLeft/ShiftRight keydown
+  // must pass: Sogou reports the English-mode toggle as Process/229 with that
+  // physical code, then an empty compositionend and a later latin input.
+  // The keyup stays here so a Shift-coded 229 release cannot become a kitty
+  // CSI-u for a press the TUI never saw. macOS and Linux are unchanged.
+  const isWindows = !isMac && !isLinux
+  if (isWindows && event.type === 'keydown' && isImeModeToggleShiftKey(event)) {
     return false
   }
   const passesStandalone229Keydown = isMac || isLinux
@@ -321,24 +324,18 @@ export function shouldSuppressTerminalInterruptKeyup(event: XtermBypassEvent): b
   )
 }
 
-export type XtermModifierKeyboardOptions = {
-  compositionActive?: boolean
-  imeShiftCommitGuardActive?: boolean
-}
-
-export function shouldSuppressTerminalModifierKeyboardEvent(
-  event: XtermBypassEvent,
-  _options?: XtermModifierKeyboardOptions
-): boolean {
+export function shouldSuppressTerminalModifierKeyboardEvent(event: XtermBypassEvent): boolean {
   if (!isXtermHandledKeyEvent(event.type) || !TERMINAL_MODIFIER_KEYS.has(event.key)) {
     return false
   }
   // Why: Sogou Shift-to-English is key=Shift whose IME/composition flags we
   // cannot trust (isComposing and the tracker are often already false). The
   // custom handler runs after xterm sets _keyDownSeen, so swallowing this
-  // keydown drops the later held-key insertText (#12099 / #22021).
+  // keydown drops the later held-key insertText (#12099 / #22021). Gating the
+  // keydown on those flags was tried and dropped the commit on native Sogou.
   // Keyup stays suppressed so kitty cannot encode a bare modifier release.
-  // CompositionHelper.keydown consumes the Shift keydown itself.
+  // CompositionHelper.keydown consumes the Shift keydown itself, which is what
+  // keeps an idle Shift from becoming a kitty press CSI-u.
   return !(event.type === 'keydown' && event.key === 'Shift')
 }
 
