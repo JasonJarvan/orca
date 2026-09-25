@@ -2,8 +2,8 @@
 // body, then Enter as a SEPARATE delayed pty write. Kept apart from the pure
 // byte builders in native-chat-send.ts so those stay IO-free and unit-testable.
 
+import { sendRuntimeAgentPrompt } from '@/runtime/runtime-terminal-agent-prompt'
 import {
-  sendRuntimeAgentPrompt,
   sendRuntimePtyInput,
   sendRuntimePtyInputVerified
 } from '@/runtime/runtime-terminal-inspection'

@@ -39,10 +39,13 @@ function terminal() {
   }
 }
 
-function createRuntime(provider?: {
-  supportsAgentSessionClaims?: () => boolean
-  supportsAgentSessionCreateOperations?: () => boolean
-}, agentHostMode?: 'desktop' | 'serve' | 'orcad') {
+function createRuntime(
+  provider?: {
+    supportsAgentSessionClaims?: () => boolean
+    supportsAgentSessionCreateOperations?: () => boolean
+  },
+  agentHostMode?: 'desktop' | 'serve' | 'orcad'
+) {
   const runtime = new OrcaRuntimeService(
     {
       getSettings: () => ({
@@ -55,7 +58,12 @@ function createRuntime(provider?: {
     undefined,
     provider || agentHostMode
       ? {
-          ...(provider ? { getLocalProvider: () => provider as never } : {}),
+          ...(provider
+            ? {
+                // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test provider only implements the session-claim probes this runtime reads.
+                getLocalProvider: () => provider as never
+              }
+            : {}),
           ...(agentHostMode ? { agentHostMode } : {})
         }
       : undefined
@@ -98,6 +106,7 @@ describe('paired Web agent launch context', () => {
     )
     expect(createTerminal.mock.calls[0]?.[1]?.command).toContain('inspect the runtime')
     expect(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the one-shot ledger is runtime-private and this test only reads whether a prompt launch armed it.
       (
         runtime as unknown as {
           agentClientContextByPtyId: Map<string, unknown>
@@ -137,6 +146,7 @@ describe('paired Web agent launch context', () => {
       ORCA_HOST_MODE: 'serve'
     })
     expect(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the one-shot ledger is runtime-private and this test only reads the pending flag for the resumed PTY.
       (
         runtime as unknown as {
           agentClientContextByPtyId: Map<string, { pending: boolean }>

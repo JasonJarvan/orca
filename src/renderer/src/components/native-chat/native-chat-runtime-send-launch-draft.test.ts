@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const sendRuntimePtyInput = vi.fn()
 const sendRuntimePtyInputVerified = vi.fn()
 const sendRuntimeAgentPrompt = vi.fn()
+vi.mock('@/runtime/runtime-terminal-agent-prompt', () => ({
+  sendRuntimeAgentPrompt: (...args: unknown[]) => sendRuntimeAgentPrompt(...args)
+}))
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
-  sendRuntimeAgentPrompt: (...args: unknown[]) => sendRuntimeAgentPrompt(...args),
   sendRuntimePtyInput: (...args: unknown[]) => sendRuntimePtyInput(...args),
   sendRuntimePtyInputVerified: (...args: unknown[]) => sendRuntimePtyInputVerified(...args)
 }))
@@ -139,6 +141,7 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
   })
 
   it('keeps a remote Electron composer on the existing raw byte path', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test flag is a window global the Web client detector reads and the DOM lib does not declare.
     ;(window as unknown as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ = false
     window.location.pathname = '/index.html'
     const remotePty = 'remote:env-1@@term-1'
@@ -269,6 +272,7 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
 describe('image sends with a parked multi-line draft', () => {
   it('does not claim semantic Agent-prompt delivery for an image-only send', async () => {
     const handle = sendNativeChatMessageWithImageAttachments(
+      'codex',
       SETTINGS,
       'remote:env-1@@term-1',
       '',
@@ -285,6 +289,7 @@ describe('image sends with a parked multi-line draft', () => {
 
   it('submits an image caption through the semantic Agent-prompt boundary', async () => {
     const handle = sendNativeChatMessageWithImageAttachments(
+      'codex',
       SETTINGS,
       'remote:env-1@@term-1',
       'caption',
@@ -317,6 +322,7 @@ describe('image sends with a parked multi-line draft', () => {
     )
     const remotePty = 'remote:env-1@@term-1'
     const handle = sendNativeChatMessageWithImageAttachments(
+      'codex',
       SETTINGS,
       remotePty,
       'caption',

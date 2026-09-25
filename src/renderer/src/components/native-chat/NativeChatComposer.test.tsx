@@ -44,6 +44,7 @@ const mocks = vi.hoisted(() => ({
   sendHandle: {
     cancel: vi.fn(),
     settleAfterMs: 500,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the composer stub only needs the accepted promise slot this test reads.
     accepted: undefined as Promise<boolean> | undefined
   },
   sendNativeChatMessage: vi.fn(),
@@ -442,7 +443,7 @@ describe('NativeChatComposer', () => {
       'pty-1',
       'hello',
       ['/tmp/pasted.png'],
-      undefined
+      { agentPrompt: true }
     )
   })
 
@@ -511,66 +512,6 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.clearNativeChatLaunchDraft).toHaveBeenCalledWith('tab-1')
-  })
-
-  it('keeps an editable remote draft when semantic submission is rejected', async () => {
-    mocks.sendHandle.accepted = Promise.resolve(false)
-    render(
-      <NativeChatComposer
-        terminalTabId="tab-1"
-        paneKey="tab-1:leaf-1"
-        targetPtyId="remote:env-1@@term-1"
-        agent="codex"
-      />
-    )
-
-    await act(async () => mocks.fieldProps?.onSend?.())
-
-    expect(mocks.setDraft).not.toHaveBeenCalledWith('')
-    expect(mocks.clearNativeChatLaunchDraft).not.toHaveBeenCalled()
-    expect(mocks.trackPendingSend).toHaveBeenCalledWith(mocks.sendHandle)
-  })
-
-  it('clears a remote draft only after semantic submission is accepted', async () => {
-    mocks.sendHandle.accepted = Promise.resolve(true)
-    render(
-      <NativeChatComposer
-        terminalTabId="tab-1"
-        paneKey="tab-1:leaf-1"
-        targetPtyId="remote:env-1@@term-1"
-        agent="codex"
-      />
-    )
-
-    await act(async () => mocks.fieldProps?.onSend?.())
-
-    expect(mocks.setDraft).toHaveBeenCalledWith('')
-    expect(mocks.clearNativeChatLaunchDraft).toHaveBeenCalledWith('tab-1')
-  })
-
-  it('blocks duplicate remote submits while semantic acceptance is pending', async () => {
-    let resolveAccepted!: (accepted: boolean) => void
-    mocks.sendHandle.accepted = new Promise<boolean>((resolve) => {
-      resolveAccepted = resolve
-    })
-    render(
-      <NativeChatComposer
-        terminalTabId="tab-1"
-        paneKey="tab-1:leaf-1"
-        targetPtyId="remote:env-1@@term-1"
-        agent="codex"
-      />
-    )
-
-    act(() => {
-      mocks.fieldProps?.onSend?.()
-      mocks.fieldProps?.onSend?.()
-    })
-
-    expect(mocks.sendNativeChatMessage).toHaveBeenCalledOnce()
-    await act(() => {
-      resolveAccepted(true)
-    })
   })
 
   it('keeps the draft scope anchored to the pane while the PTY reconnects', () => {

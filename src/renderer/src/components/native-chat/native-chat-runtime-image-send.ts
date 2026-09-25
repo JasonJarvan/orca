@@ -1,6 +1,7 @@
 import { agentImagePasteWrites, formatAgentImagePath } from '../../../../shared/agent-image-paste'
 import type { AgentType } from '../../../../shared/agent-status-types'
-import { sendRuntimeAgentPrompt, sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
+import { sendRuntimeAgentPrompt } from '@/runtime/runtime-terminal-agent-prompt'
+import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { NATIVE_CHAT_SUBMIT_DELAY_MS } from '../../../../shared/native-chat-answer-stepping'

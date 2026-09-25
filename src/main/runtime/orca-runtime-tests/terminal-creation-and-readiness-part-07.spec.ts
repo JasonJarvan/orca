@@ -653,6 +653,7 @@ describe('OrcaRuntimeService', () => {
     runtime.onPtyExit(ptyId!, 0)
 
     expect(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the one-shot ledger is runtime-private and this test only checks that PTY exit drops it.
       (
         runtime as unknown as {
           agentClientContextByPtyId: Map<string, unknown>
