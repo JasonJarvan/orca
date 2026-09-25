@@ -34,6 +34,7 @@ describe('terminal custom title runtime mirror', () => {
     const set = (update: (current: typeof state) => Partial<typeof state>): void => {
       state = { ...state, ...update(state) }
     }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this double only populates the tab maps setTabCustomTitle reads.
     const actions = createTerminalTabAttentionActions(set as never, (() => state) as never)
 
     actions.setTabCustomTitle('terminal-1', 'Shared build')

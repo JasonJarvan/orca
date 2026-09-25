@@ -31,10 +31,12 @@ const storeBase = {
   }),
   getRepos: () => [storeBase.getRepo()],
   addRepo: () => {},
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: title persistence never calls updateRepo; the stub only satisfies the store contract.
   updateRepo: () => undefined as never,
   getAllWorktreeMeta: () => ({}),
   getWorktreeMeta: () => undefined,
   getGitHubCache: () => ({ pr: {}, issue: {} }),
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: title persistence never calls setWorktreeMeta; the stub only satisfies the store contract.
   setWorktreeMeta: () => undefined as never,
   removeWorktreeMeta: () => {},
   getRetiredWorktreeNameRegistry: () => ({ exhaustedTiers: 0, names: [] }),
