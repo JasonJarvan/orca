@@ -191,19 +191,27 @@ describe('OrcaRuntimeService', () => {
       hydrateHeadlessMobileSessionTabsFromWorkspaceSession: (worktreeId: string) => Set<string>
     }
 
-    const beforeRestart = new OrcaRuntimeService(runtimeStore as never)
-    const beforeInternals = beforeRestart as unknown as RestartInternals
-    beforeInternals.recordPtyWorktree('persisted-pty', TEST_WORKTREE_ID, {
-      connected: true,
-      incarnationId: 'incarnation-old',
-      tabId: 'host-tab',
-      paneKey
-    })
-    beforeInternals.hydrateHeadlessMobileSessionTabsFromWorkspaceSession(TEST_WORKTREE_ID)
+    const listAfterRecording = async (
+      ptyId: string,
+      incarnationId: string
+    ): Promise<Awaited<ReturnType<OrcaRuntimeService['listTerminals']>>> => {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the workspace-session fixture spreads the shared store; this restart test only reads that session.
+      const runtime = new OrcaRuntimeService(runtimeStore as never)
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: recordPtyWorktree and headless hydration are protected on the split runtime; this test seeds them before listing.
+      const internals = runtime as unknown as RestartInternals
+      internals.recordPtyWorktree(ptyId, TEST_WORKTREE_ID, {
+        connected: true,
+        incarnationId,
+        tabId: 'host-tab',
+        paneKey
+      })
+      internals.hydrateHeadlessMobileSessionTabsFromWorkspaceSession(TEST_WORKTREE_ID)
+      return runtime.listTerminals(`id:${TEST_WORKTREE_ID}`, 100, {
+        includeVisualLayouts: true
+      })
+    }
 
-    const before = await beforeRestart.listTerminals(`id:${TEST_WORKTREE_ID}`, 100, {
-      includeVisualLayouts: true
-    })
+    const before = await listAfterRecording('persisted-pty', 'incarnation-old')
     expect(before.terminals).toEqual([
       expect.objectContaining({
         ptyId: 'persisted-pty',
@@ -211,19 +219,7 @@ describe('OrcaRuntimeService', () => {
       })
     ])
 
-    const afterRestart = new OrcaRuntimeService(runtimeStore as never)
-    const afterInternals = afterRestart as unknown as RestartInternals
-    afterInternals.recordPtyWorktree('replacement-pty', TEST_WORKTREE_ID, {
-      connected: true,
-      incarnationId: 'incarnation-new',
-      tabId: 'host-tab',
-      paneKey
-    })
-    afterInternals.hydrateHeadlessMobileSessionTabsFromWorkspaceSession(TEST_WORKTREE_ID)
-
-    const after = await afterRestart.listTerminals(`id:${TEST_WORKTREE_ID}`, 100, {
-      includeVisualLayouts: true
-    })
+    const after = await listAfterRecording('replacement-pty', 'incarnation-new')
     expect(after.visualLayouts).toBeUndefined()
     expect(after.terminals).toEqual([
       expect.objectContaining({
@@ -234,19 +230,7 @@ describe('OrcaRuntimeService', () => {
       })
     ])
 
-    const reusedPtyIdAfterRestart = new OrcaRuntimeService(runtimeStore as never)
-    const reusedInternals = reusedPtyIdAfterRestart as unknown as RestartInternals
-    reusedInternals.recordPtyWorktree('persisted-pty', TEST_WORKTREE_ID, {
-      connected: true,
-      incarnationId: 'incarnation-new',
-      tabId: 'host-tab',
-      paneKey
-    })
-    reusedInternals.hydrateHeadlessMobileSessionTabsFromWorkspaceSession(TEST_WORKTREE_ID)
-
-    const reused = await reusedPtyIdAfterRestart.listTerminals(`id:${TEST_WORKTREE_ID}`, 100, {
-      includeVisualLayouts: true
-    })
+    const reused = await listAfterRecording('persisted-pty', 'incarnation-new')
     expect(reused.terminals).toEqual([
       expect.objectContaining({
         ptyId: 'persisted-pty',

@@ -633,6 +633,7 @@ describe('PtyHandler', () => {
       }
     }
 
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the node-pty spawn mock is untyped; the third argument is the options object this spawn passed through.
     const env = mockPtySpawn.mock.calls[0]?.[2]?.env as Record<string, string>
     expect(env.ORCA_PANE_KEY).toBeUndefined()
     expect(env.ORCA_TAB_ID).toBeUndefined()
@@ -652,6 +653,7 @@ describe('PtyHandler', () => {
       }
     })
 
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the node-pty spawn mock is untyped; the third argument is the options object this spawn passed through.
     const env = mockPtySpawn.mock.calls[0]?.[2]?.env as Record<string, string>
     expect(env.ORCA_PANE_KEY).toBe('child-tab:child-leaf')
     expect(env.ORCA_TAB_ID).toBe('child-tab')
